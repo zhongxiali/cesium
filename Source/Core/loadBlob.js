@@ -1,7 +1,9 @@
 /*global define*/
 define([
+        './defaultValue',
         './loadWithXhr'
     ], function(
+        defaultValue,
         loadWithXhr) {
     "use strict";
 
@@ -14,7 +16,7 @@ define([
      * @exports loadBlob
      *
      * @param {String|Promise} url The URL of the data, or a promise for the URL.
-     * @param {Object} [headers] HTTP headers to send with the requests.
+     * @param {Object} [options.headers] HTTP headers to send with the requests.
      * @returns {Promise} a promise that will resolve to the requested data when loaded.
      *
      * @see {@link http://www.w3.org/TR/cors/|Cross-Origin Resource Sharing}
@@ -28,11 +30,13 @@ define([
      *     // an error occurred
      * });
      */
-    var loadBlob = function(url, headers) {
+    var loadBlob = function(url, options) {
+        options = defaultValue(options, defaultValue.EMPTY_OBJECT);
         return loadWithXhr({
             url : url,
             responseType : 'blob',
-            headers : headers
+            headers : options.headers,
+            timeout : options.timeout
         });
     };
 

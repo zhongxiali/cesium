@@ -283,6 +283,8 @@ define([
      */
     ImageryProvider.prototype.pickFeatures = DeveloperError.throwInstantiationError;
 
+    var timeoutImage;
+
     /**
      * Loads an image from a given URL.  If the server referenced by the URL already has
      * too many requests pending, this function will instead return undefined, indicating
@@ -295,7 +297,32 @@ define([
      *          Image or a Canvas DOM object.
      */
     ImageryProvider.loadImage = function(imageryProvider, url) {
-        if (defined(imageryProvider.tileDiscardPolicy)) {
+        if (defined(imageryProvider.tileDownloadTimeout)) {
+            return throttleRequestByServer(url, function(url) {
+                return loadImageViaBlob(url, {
+                    timeout: imageryProvider.tileDownloadTimeout
+                }).otherwise(function(e) {
+                    if (e && e.isTimeout) {
+                        if (!defined(timeoutImage)) {
+                            timeoutImage = document.createElement('canvas');
+                            timeoutImage.width = 256;
+                            timeoutImage.height = 256;
+
+                            var context = timeoutImage.getContext('2d');
+                            context.strokeStyle = 'red';
+                            context.strokeRect(0, 0, 256, 256);
+
+                            context.font = '20px sans-serif';
+                            context.fillStyle='white';
+                            context.fillText('This tile took more than ' + (imageryProvider.tileDownloadTimeout / 1000.0) + ' seconds to download and was canceled', 10, 50, 236);
+                        }
+                        return timeoutImage;
+                    } else {
+                        throw e;
+                    }
+                });
+            });
+        } else if (defined(imageryProvider.tileDiscardPolicy)) {
             return throttleRequestByServer(url, loadImageViaBlob);
         }
         return throttleRequestByServer(url, loadImage);

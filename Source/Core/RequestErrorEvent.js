@@ -28,6 +28,13 @@ define([
         this.statusCode = statusCode;
 
         /**
+         * True if the error was a result of a client-side timeout period expiring; otherwise, false.
+         * @type {Boolean}
+         * @default false
+         */
+        this.isTimeout = false;
+
+        /**
          * The response included along with the error.  If the error does not include a response,
          * this property will be undefined.
          *

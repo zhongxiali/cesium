@@ -45,12 +45,12 @@ define([
      *     // images is an array containing all the loaded images
      * });
      */
-    var loadImageViaBlob = function(url) {
+    var loadImageViaBlob = function(url, options) {
         if (dataUriRegex.test(url)) {
             return loadImage(url);
         }
 
-        return loadBlob(url).then(function(blob) {
+        return loadBlob(url, options).then(function(blob) {
             var blobUrl = window.URL.createObjectURL(blob);
 
             return loadImage(blobUrl, false).then(function(image) {

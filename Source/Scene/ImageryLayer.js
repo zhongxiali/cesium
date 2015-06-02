@@ -197,6 +197,14 @@ define([
          */
         this.show = defaultValue(options.show, true);
 
+        /**
+         * Determines if this layer is required.  A terrain tile will not be shown unless its
+         * all required imagery layers overlapping that tile can also be shown.
+         * @type {Boolean}
+         * @default true
+         */
+        this.isRequired = defaultValue(options.isRequired, true);
+
         this._minimumTerrainLevel = options.minimumTerrainLevel;
         this._maximumTerrainLevel = options.maximumTerrainLevel;
 

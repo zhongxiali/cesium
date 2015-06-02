@@ -384,7 +384,8 @@ define([
             isDoneLoading = isDoneLoading && thisTileDoneLoading;
 
             // The imagery is renderable as soon as we have any renderable imagery for this region.
-            isRenderable = isRenderable && (thisTileDoneLoading || defined(tileImagery.readyImagery));
+            var isNotRequired = defined(tileImagery.loadingImagery) && defined(tileImagery.loadingImagery.imageryLayer) && !tileImagery.loadingImagery.imageryLayer.isRequired;
+            isRenderable = isRenderable && (thisTileDoneLoading || defined(tileImagery.readyImagery) || isNotRequired);
 
             isUpsampledOnly = isUpsampledOnly && defined(tileImagery.loadingImagery) &&
                              (tileImagery.loadingImagery.state === ImageryState.FAILED || tileImagery.loadingImagery.state === ImageryState.INVALID);

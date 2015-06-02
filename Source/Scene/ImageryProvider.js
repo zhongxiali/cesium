@@ -283,8 +283,6 @@ define([
      */
     ImageryProvider.prototype.pickFeatures = DeveloperError.throwInstantiationError;
 
-    var timeoutImage;
-
     /**
      * Loads an image from a given URL.  If the server referenced by the URL already has
      * too many requests pending, this function will instead return undefined, indicating
@@ -303,8 +301,8 @@ define([
                     timeout: imageryProvider.tileDownloadTimeout
                 }).otherwise(function(e) {
                     if (e && e.isTimeout) {
-                        if (!defined(timeoutImage)) {
-                            timeoutImage = document.createElement('canvas');
+                        if (!defined(imageryProvider.timeoutImage)) {
+                            var timeoutImage = document.createElement('canvas');
                             timeoutImage.width = 256;
                             timeoutImage.height = 256;
 
@@ -312,11 +310,25 @@ define([
                             context.strokeStyle = 'red';
                             context.strokeRect(0, 0, 256, 256);
 
-                            context.font = '20px sans-serif';
-                            context.fillStyle='white';
-                            context.fillText('This tile took more than ' + (imageryProvider.tileDownloadTimeout / 1000.0) + ' seconds to download and was canceled', 10, 50, 236);
+                            context.font = 'bold 20px sans-serif';
+                            context.textAlign = 'center';
+
+                            var text;
+                            if (defined(imageryProvider.tileDownloadTimeoutMessage)) {
+                                text = imageryProvider.tileDownloadTimeoutMessage;
+                            } else {
+                                text = 'This tile took more than ' + (imageryProvider.tileDownloadTimeout / 1000.0) + ' seconds to download from the data provider and was canceled.';
+                            }
+
+                            context.fillStyle = 'black';
+                            wrapText(context, 129, 52, 236, 25, text);
+
+                            context.fillStyle = 'white';
+                            var nextLineY = wrapText(context, 127, 50, 236, 25, text);
+
+                            imageryProvider.timeoutImage = timeoutImage;
                         }
-                        return timeoutImage;
+                        return imageryProvider.timeoutImage;
                     } else {
                         throw e;
                     }
@@ -327,6 +339,31 @@ define([
         }
         return throttleRequestByServer(url, loadImage);
     };
+
+    function wrapText(context, startX, startY, maxWidth, lineHeight, text) {
+        var y = startY;
+        var words = text.split(' ');
+        var line = '';
+
+        for (var i = 0; i < words.length; ++i) {
+            var testLine = line + words[i];
+            var measure = context.measureText(testLine);
+            if (measure.width > maxWidth && line.length > 0) {
+                context.fillText(line, startX, y, maxWidth);
+                line = words[i] + ' ';
+                y += lineHeight;
+            } else {
+                line = testLine + ' ';
+            }
+        }
+
+        if (line.length > 0) {
+            context.fillText(line, startX, y, maxWidth);
+            y += lineHeight;
+        }
+
+        return y;
+    }
 
     return ImageryProvider;
 });

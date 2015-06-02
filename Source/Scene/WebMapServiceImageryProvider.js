@@ -168,8 +168,6 @@ define([
 
         this._rectangle = Rectangle.intersection(this._rectangle, this._tilingScheme.rectangle);
 
-        this._tileDownloadTimeout = options.tileDownloadTimeout;
-
         var credit = options.credit;
         if (typeof credit === 'string') {
             credit = new Credit(credit);
@@ -405,12 +403,6 @@ define([
         hasAlphaChannel : {
             get : function() {
                 return true;
-            }
-        },
-
-        tileDownloadTimeout : {
-            get : function() {
-                return this._tileDownloadTimeout;
             }
         }
     });

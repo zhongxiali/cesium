@@ -309,14 +309,11 @@ define([
                     // A tile succeeded, so allow more simultaneous requests.
                     if (imageryProvider.requestThrottler) {
                         if (imageryProvider.requestThrottler.maximumInFlight === 1) {
-                            console.log('increasing to 2');
                             imageryProvider.requestThrottler.maximumInFlight = 2;
                         } else if (imageryProvider.requestThrottler.maximumInFlight === 2) {
                             imageryProvider.requestThrottler.maximumInFlight = 3;
-                            console.log('increasing to 3');
                         } else if (imageryProvider.requestThrottler.maximumInFlight === 3) {
                             imageryProvider.requestThrottler = undefined;
-                            console.log('increasing to normal');
                         }
                     }
                     return image;
@@ -324,7 +321,6 @@ define([
                     if (e && e.isTimeout) {
                         // A tile timed out, so install a throttler (if we haven't already) to limit this
                         // imagery provider to making only one request at a time.
-                        console.log('reducing to 1');
                         imageryProvider.requestThrottler = PromiseThrottler.createOrModify(imageryProvider.requestThrottler, 1);
 
                         // Display a timeout image on the globe.

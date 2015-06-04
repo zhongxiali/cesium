@@ -347,7 +347,7 @@ define([
                             wrapText(context, 129, 52, 236, 25, text);
 
                             context.fillStyle = 'white';
-                            var nextLineY = wrapText(context, 127, 50, 236, 25, text);
+                            wrapText(context, 127, 50, 236, 25, text);
 
                             imageryProvider.timeoutImage = timeoutImage;
                         }

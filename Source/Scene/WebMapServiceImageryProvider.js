@@ -141,6 +141,10 @@ define([
         this._enablePickFeatures = defaultValue(options.enablePickFeatures, true);
         this._getFeatureInfoFormats = defaultValue(options.getFeatureInfoFormats, WebMapServiceImageryProvider.DefaultGetFeatureInfoFormats);
 
+        this._recolorFunc = options.recolorFunc;
+        this._pickFeatureHook = options.pickFeatureHook;
+
+
         if (defined(options.getFeatureInfoAsGeoJson) || defined(options.getFeatureInfoAsXml)) {
             deprecationWarning('WebMapServiceImageryProvider.getFeatureInfo', 'The options.getFeatureInfoAsGeoJson and getFeatureInfoAsXml parameters to WebMapServiceImageryProvider were deprecated in Cesium 1.10 and will be removed in 1.13.  Use options.getFeatureInfoFormats instead.');
 
@@ -448,7 +452,14 @@ define([
         //>>includeEnd('debug');
 
         var url = buildImageUrl(this, x, y, level);
-        return ImageryProvider.loadImage(this, url);
+        var p = ImageryProvider.loadImage(this, url);
+        if (!p || !defined(this._recolorFunc)) {
+            return p;
+        }
+        var that = this;
+        return p.then(function (img) {
+            return that.recolorImageWithCanvasContext(that.getCanvasContext(img), img, that._recolorFunc);
+        });
     };
 
     var cartographicScratch = new Cartographic();
@@ -533,7 +544,11 @@ define([
             }
         }
 
-        return doRequest();
+        var p = doRequest();
+        if (!p || !defined(this._pickFeatureHook)) {
+            return p;
+        }
+        return p.then(that._pickFeatureHook);
     };
 
     /**
@@ -667,6 +682,65 @@ define([
 
         return url;
     }
+
+/* Recolor a raster image pixel by pixel, replacing encoded identifiers with some calculated value. */
+WebMapServiceImageryProvider.prototype.recolorImage = function(image, colorFunc) {
+    var length = image.data.length;  //pixel count * 4
+    for (var i = 0; i < length; i += 4) {
+        // Region identifiers are encoded in the blue and green channels, with R=0 and A=255
+        if (image.data[i+3] < 255 || image.data[i] !== 0) {
+            // Set any pixel that is not part of a region completely transparent
+            image.data[i+3] = 0;
+            continue;
+        }
+        // Convert the colour of a pixel back into the identifier of the region it belongs to
+        var idx = image.data[i+1] * 0x100 + image.data[i+2];
+        // Convert that identifier into the data-mapped colour it should display as.
+        var clr = colorFunc(idx);
+        if (defined(clr)) {
+            for (var j = 0; j < 4; j++) {
+                image.data[i+j] = clr[j];
+            }
+        }
+        else {
+            // This is a region but we don't have data for it, so make it transparent. Possibly should be configurable.
+            image.data[i+3] = 0;
+        }
+    }
+    return image;
+};
+
+WebMapServiceImageryProvider.prototype.getCanvasContext =function(img) {
+    var context = this._canvas2dContext;
+    if (!defined(context) || context.canvas.width !== img.width || context.canvas.height !== img.height) {
+        var canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        context = canvas.getContext("2d");
+        this._canvas2dContext = context;
+    }
+    return context;
+};
+
+/* Copy an image to a newly created Canvas, then perform recoloring there. */
+WebMapServiceImageryProvider.prototype.recolorImageWithCanvasContext = function(context, img, colorFunc) {
+    if (!defined(context)) {
+        throw new DeveloperError('No context for image recoloring.');
+    }
+
+    // Copy the image contents to the canvas
+    context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+    context.drawImage(img, 0, 0);
+    var image = context.getImageData(0, 0, context.canvas.width, context.canvas.height);
+    image = recolorImage(image, colorFunc);
+    return image;
+};
+
+
+
+
+
 
     return WebMapServiceImageryProvider;
 });

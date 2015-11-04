@@ -142,7 +142,7 @@ define([
 
         function metadataSuccess(data) {
             var tileInfo = data.tileInfo;
-            if (!defined(tileInfo)) {
+            if (!defined(tileInfo) || (defined(that._layers) && that._layers.length > 0)) {
                 that._useTiles = false;
             } else {
                 that._tileWidth = tileInfo.rows;

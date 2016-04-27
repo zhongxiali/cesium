@@ -164,7 +164,7 @@ defineSuite([
         });
     }
 
-    function verifyRender(model) {
+    function expectRender(model) {
         expect(model.ready).toBe(true);
         expect(scene.renderForSpecs()).toEqual([0, 0, 0, 255]);
         model.show = true;
@@ -208,13 +208,41 @@ defineSuite([
        expect(texturedBoxModel.debugWireframe).toEqual(false);
     });
 
+    it('preserves query string in url', function() {
+        var params = '?param1=1&param2=2';
+        var url = texturedBoxUrl + params;
+        var model = Model.fromGltf({
+            url: url
+        });
+        expect(model._basePath).toEndWith(params);
+        expect(model._baseUri).toEndWith(params);
+    });
+
     it('renders', function() {
-        verifyRender(texturedBoxModel);
+        expectRender(texturedBoxModel);
     });
 
     it('resolves readyPromise', function() {
         return texturedBoxModel.readyPromise.then(function(model) {
-            verifyRender(model);
+            expectRender(model);
+        });
+    });
+
+    it('rejects readyPromise on error', function() {
+        var invalidGltf = clone(texturedBoxModel.gltf, true);
+        invalidGltf.shaders.CesiumTexturedBoxTest0FS.uri = 'invalid.glsl';
+
+        var model = primitives.add(new Model({
+            gltf : invalidGltf
+        }));
+
+        scene.renderForSpecs();
+
+        return model.readyPromise.then(function(model) {
+            fail('should not resolve');
+        }).otherwise(function(error) {
+            expect(model.ready).toEqual(false);
+            primitives.remove(model);
         });
     });
 
@@ -239,7 +267,7 @@ defineSuite([
     it('renders from glTF', function() {
         // Simulate using procedural glTF as opposed to loading it from a file
         return loadModelJson(texturedBoxModel.gltf).then(function(model) {
-            verifyRender(model);
+            expectRender(model);
             primitives.remove(model);
         });
     });
@@ -309,7 +337,7 @@ defineSuite([
 
     it('renders bounding volume', function() {
         texturedBoxModel.debugShowBoundingVolume = true;
-        verifyRender(texturedBoxModel);
+        expectRender(texturedBoxModel);
         texturedBoxModel.debugShowBoundingVolume = false;
     });
 
@@ -360,7 +388,7 @@ defineSuite([
         node.matrix = Matrix4.fromUniformScale(1.01, new Matrix4());
         expect(texturedBoxModel._cesiumAnimationsDirty).toEqual(true);
 
-        verifyRender(texturedBoxModel);
+        expectRender(texturedBoxModel);
 
         expect(texturedBoxModel._cesiumAnimationsDirty).toEqual(false);
 
@@ -457,8 +485,8 @@ defineSuite([
 
     it('boundingSphere returns the bounding sphere', function() {
         var boundingSphere = texturedBoxModel.boundingSphere;
-        expect(boundingSphere.center).toEqualEpsilon(new Cartesian3(0.0, -0.25, 0.0), CesiumMath.EPSILON3);
-        expect(boundingSphere.radius).toEqualEpsilon(0.75, CesiumMath.EPSILON3);
+        expect(boundingSphere.center).toEqualEpsilon(new Cartesian3(0.0, 0.0, 0.0), CesiumMath.EPSILON3);
+        expect(boundingSphere.radius).toEqualEpsilon(0.866, CesiumMath.EPSILON3);
     });
 
     it('boundingSphere returns the bounding sphere when scale property is set', function() {
@@ -466,8 +494,8 @@ defineSuite([
         texturedBoxModel.scale = 10;
 
         var boundingSphere = texturedBoxModel.boundingSphere;
-        expect(boundingSphere.center).toEqualEpsilon(new Cartesian3(0.0, -2.5, 0.0), CesiumMath.EPSILON3);
-        expect(boundingSphere.radius).toEqualEpsilon(7.5, CesiumMath.EPSILON3);
+        expect(boundingSphere.center).toEqualEpsilon(new Cartesian3(0.0, 0.0, 0.0), CesiumMath.EPSILON3);
+        expect(boundingSphere.radius).toEqualEpsilon(8.66, CesiumMath.EPSILON3);
 
         texturedBoxModel.scale = originalScale;
     });
@@ -479,8 +507,8 @@ defineSuite([
         texturedBoxModel.maximumScale = 10;
 
         var boundingSphere = texturedBoxModel.boundingSphere;
-        expect(boundingSphere.center).toEqualEpsilon(new Cartesian3(0.0, -2.5, 0.0), CesiumMath.EPSILON3);
-        expect(boundingSphere.radius).toEqualEpsilon(7.5, CesiumMath.EPSILON3);
+        expect(boundingSphere.center).toEqualEpsilon(new Cartesian3(0.0, 0.0, 0.0), CesiumMath.EPSILON3);
+        expect(boundingSphere.radius).toEqualEpsilon(8.66, CesiumMath.EPSILON3);
 
         texturedBoxModel.scale = originalScale;
         texturedBoxModel.maximumScale = originalMaximumScale;
@@ -491,8 +519,8 @@ defineSuite([
         Matrix4.multiplyByScale(texturedBoxModel.modelMatrix, new Cartesian3(2, 5, 10), texturedBoxModel.modelMatrix);
 
         var boundingSphere = texturedBoxModel.boundingSphere;
-        expect(boundingSphere.center).toEqualEpsilon(new Cartesian3(0.0, -1.25, 0.0), CesiumMath.EPSILON3);
-        expect(boundingSphere.radius).toEqualEpsilon(7.5, CesiumMath.EPSILON3);
+        expect(boundingSphere.center).toEqualEpsilon(new Cartesian3(0.0, 0.0, 0.0), CesiumMath.EPSILON3);
+        expect(boundingSphere.radius).toEqualEpsilon(8.66, CesiumMath.EPSILON3);
 
         texturedBoxModel.modelMatrix = originalMatrix;
     });
@@ -547,35 +575,35 @@ defineSuite([
             var rotation = m.gltf.nodes['Geometry-mesh005Node'].rotation;
             expect(rotation).toEqual([0.0, 0.0, 0.0, 1.0]);
 
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('loads a glTF model that doesn\'t have a technique', function() {
         return loadModel(boxNoTechniqueUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('loads a glTF model that doesn\'t have indices', function() {
         return loadModel(boxNoIndicesUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('renders texturedBoxCustom (all uniform semantics)', function() {
         return loadModel(texturedBoxCustomUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('renders a model with the KHR_binary_glTF extension', function() {
         return loadModel(texturedBoxKhrBinaryUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
@@ -583,7 +611,7 @@ defineSuite([
     it('loads a model with the KHR_binary_glTF extension as an ArrayBuffer using new Model', function() {
         return loadArrayBuffer(texturedBoxKhrBinaryUrl).then(function(arrayBuffer) {
             return loadModelJson(arrayBuffer).then(function(model) {
-                verifyRender(model);
+                expectRender(model);
                 primitives.remove(model);
             });
         });
@@ -592,7 +620,7 @@ defineSuite([
     it('loads a model with the KHR_binary_glTF extension as an Uint8Array using new Model', function() {
         return loadArrayBuffer(texturedBoxKhrBinaryUrl).then(function(arrayBuffer) {
             return loadModelJson(new Uint8Array(arrayBuffer)).then(function(model) {
-                verifyRender(model);
+                expectRender(model);
                 primitives.remove(model);
             });
         });
@@ -628,17 +656,18 @@ defineSuite([
             minimumPixelSize : 1
         }).then(function(m) {
             var bs = m.boundingSphere;
-            expect(bs.center.equalsEpsilon(new Cartesian3(6378137.0, -0.25, 0.0), CesiumMath.EPSILON14));
-            expect(bs.radius).toEqualEpsilon(0.75, CesiumMath.EPSILON14);
+            expect(bs.center.equalsEpsilon(new Cartesian3(6378137.0, 0.0, 0.0), CesiumMath.EPSILON14));
+            var radius = Math.sqrt(0.5 * 0.5 * 3);
+            expect(bs.radius).toEqualEpsilon(radius, CesiumMath.EPSILON14);
 
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('renders textured box with external resources: .glsl, .bin, and .png files', function() {
         return loadModel(texturedBoxSeparateUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
@@ -652,7 +681,7 @@ defineSuite([
     });
 
     it('renders cesiumAir (has translucency)', function() {
-        verifyRender(cesiumAirModel);
+        expectRender(cesiumAirModel);
     });
 
     it('renders cesiumAir with per-node show (root)', function() {
@@ -764,7 +793,7 @@ defineSuite([
     ///////////////////////////////////////////////////////////////////////////
 
     it('renders animBoxes without animation', function() {
-        verifyRender(animBoxesModel);
+        expectRender(animBoxesModel);
     });
 
     it('adds and removes all animations', function() {
@@ -1138,7 +1167,7 @@ defineSuite([
     ///////////////////////////////////////////////////////////////////////////
 
     it('renders riggedFigure without animation', function() {
-        verifyRender(riggedFigureModel);
+        expectRender(riggedFigureModel);
     });
 
     it('renders riggedFigure with animation (skinning)', function() {
@@ -1166,7 +1195,7 @@ defineSuite([
     it('renders riggedSimple', function() {
         return loadModel(riggedSimpleUrl).then(function(m) {
             expect(m).toBeDefined();
-            verifyRender(m);
+            expectRender(m);
         });
     });
 
@@ -1185,7 +1214,7 @@ defineSuite([
             expect(m.releaseGltfJson).toEqual(true);
             expect(m.gltf).not.toBeDefined();
 
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
@@ -1199,7 +1228,7 @@ defineSuite([
             expect(m.releaseGltfJson).toEqual(true);
             expect(m.gltf).not.toBeDefined();
 
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
@@ -1245,8 +1274,8 @@ defineSuite([
             expect(modelRendererResourceCache[key].count).toEqual(2);
             expect(modelRendererResourceCache[key].ready).toEqual(true);
 
-            verifyRender(m);
-            verifyRender(m2);
+            expectRender(m);
+            expectRender(m2);
 
             primitives.remove(m);
             expect(gltfCache[key].count).toEqual(1);
@@ -1289,8 +1318,8 @@ defineSuite([
             expect(gltfCache[key].ready).toEqual(true);
             expect(gltfCache[key].count).toEqual(2);
 
-            verifyRender(m);
-            verifyRender(m2);
+            expectRender(m);
+            expectRender(m2);
 
             primitives.remove(m);
             expect(gltfCache[key].count).toEqual(1);
@@ -1334,7 +1363,7 @@ defineSuite([
 
             return m.ready;
         }, { timeout : 10000 }).then(function() {
-            verifyRender(m);
+            expectRender(m);
 
             primitives.remove(m);
             expect(gltfCache[key]).not.toBeDefined();
@@ -1409,9 +1438,9 @@ defineSuite([
 
             return false;
         }, { timeout : 10000 }).then(function() {
-            verifyRender(m);
-            verifyRender(m2);
-            verifyRender(m3);
+            expectRender(m);
+            expectRender(m2);
+            expectRender(m3);
 
             primitives.remove(m);
             primitives.remove(m2);
@@ -1429,7 +1458,7 @@ defineSuite([
             incrementallyLoadTextures : true
         }).then(function(m) {
             // Get the rendered color of the model before textures are loaded
-            var loadedColor = verifyRender(m);
+            var loadedColor = expectRender(m);
 
             pollToPromise(function() {
                 // Render scene to progressively load textures
@@ -1437,7 +1466,7 @@ defineSuite([
                 // Textures have finished loading
                 return (m.pendingTextureLoads === 0);
             }, { timeout : 10000 }).then(function() {
-                var finishedColor = verifyRender(m);
+                var finishedColor = expectRender(m);
                 expect(finishedColor).not.toEqual(loadedColor);
                 primitives.remove(m);
             });
@@ -1449,7 +1478,7 @@ defineSuite([
             incrementallyLoadTextures : false
         }).then(function(m) {
             // Get the rendered color of the model before textures are loaded
-            var loadedColor = verifyRender(m);
+            var loadedColor = expectRender(m);
 
             pollToPromise(function() {
                 // Render scene to progressively load textures (they should already be loaded)
@@ -1457,7 +1486,7 @@ defineSuite([
                 // Textures have finished loading
                 return !defined(m._loadResources);
             }, { timeout : 10000 }).then(function() {
-                var finishedColor = verifyRender(m);
+                var finishedColor = expectRender(m);
                 expect(finishedColor).toEqual(loadedColor);
                 primitives.remove(m);
             });
@@ -1466,28 +1495,28 @@ defineSuite([
 
     it('loads a glTF with KHR_materials_common using the constant lighting model', function() {
         return loadModel(boxConstantUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('loads a glTF with KHR_materials_common using the lambert lighting model', function() {
         return loadModel(boxLambertUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('loads a glTF with KHR_materials_common using the blinn lighting model', function() {
         return loadModel(boxBlinnUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('loads a glTF with KHR_materials_common using the phong lighting model', function() {
         return loadModel(boxPhongUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
@@ -1508,42 +1537,42 @@ defineSuite([
 
     it('loads a glTF with KHR_materials_common using an ambient light', function() {
         return loadModel(boxAmbientLightUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('loads a glTF with KHR_materials_common using a directional light', function() {
         return loadModel(boxDirectionalLightUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('loads a glTF with KHR_materials_common using a point light', function() {
         return loadModel(boxPointLightUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('loads a glTF with KHR_materials_common using a spot light', function() {
         return loadModel(boxSpotLightUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('loads a glTF with KHR_materials_common that has skinning', function() {
         return loadModel(CesiumManUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
 
     it('loads a glTF with KHR_materials_common that has transparency', function() {
         return loadModel(boxTransparentUrl).then(function(m) {
-            verifyRender(m);
+            expectRender(m);
             primitives.remove(m);
         });
     });
@@ -1596,7 +1625,7 @@ defineSuite([
         };
 
         return loadModelJson(texturedBoxModel.gltf, options).then(function(model) {
-            var pixelColor = verifyRender(model);
+            var pixelColor = expectRender(model);
             expect(pixelColor).toEqual([255, 255, 255, 255]);
             primitives.remove(model);
         });

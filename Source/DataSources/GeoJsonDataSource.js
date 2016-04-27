@@ -12,6 +12,7 @@ define([
         '../Core/loadJson',
         '../Core/PinBuilder',
         '../Core/PolygonHierarchy',
+        '../Core/RequestScheduler',
         '../Core/RuntimeError',
         '../Scene/VerticalOrigin',
         '../ThirdParty/topojson',
@@ -38,6 +39,7 @@ define([
         loadJson,
         PinBuilder,
         PolygonHierarchy,
+        RequestScheduler,
         RuntimeError,
         VerticalOrigin,
         topojson,
@@ -59,7 +61,8 @@ define([
 
     var crsNames = {
         'urn:ogc:def:crs:OGC:1.3:CRS84' : defaultCrsFunction,
-        'EPSG:4326' : defaultCrsFunction
+        'EPSG:4326' : defaultCrsFunction,
+        'urn:ogc:def:crs:EPSG::4326' : defaultCrsFunction
     };
 
     var crsLinkHrefs = {};
@@ -766,7 +769,7 @@ define([
             if (!defined(sourceUri)) {
                 sourceUri = data;
             }
-            promise = loadJson(data);
+            promise = RequestScheduler.request(data, loadJson);
         }
 
         options = {

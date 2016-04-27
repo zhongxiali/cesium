@@ -29,11 +29,13 @@ define([
         '../Core/PinBuilder',
         '../Core/PolygonHierarchy',
         '../Core/Rectangle',
+        '../Core/RequestScheduler',
         '../Core/RuntimeError',
         '../Core/TimeInterval',
         '../Core/TimeIntervalCollection',
         '../Scene/HorizontalOrigin',
         '../Scene/LabelStyle',
+        '../Scene/SceneMode',
         '../ThirdParty/Autolinker',
         '../ThirdParty/Uri',
         '../ThirdParty/when',
@@ -86,11 +88,13 @@ define([
         PinBuilder,
         PolygonHierarchy,
         Rectangle,
+        RequestScheduler,
         RuntimeError,
         TimeInterval,
         TimeIntervalCollection,
         HorizontalOrigin,
         LabelStyle,
+        SceneMode,
         Autolinker,
         Uri,
         when,
@@ -201,6 +205,11 @@ define([
     });
 
     var BILLBOARD_SIZE = 32;
+
+    var BILLBOARD_NEAR_DISTANCE = 2414016;
+    var BILLBOARD_NEAR_RATIO = 1.0;
+    var BILLBOARD_FAR_DISTANCE = 1.6093e+7;
+    var BILLBOARD_FAR_RATIO = 0.1;
 
     function isZipFile(blob) {
         var magicBlob = blob.slice(0, Math.min(4, blob.size));
@@ -565,7 +574,8 @@ define([
         var billboard = new BillboardGraphics();
         billboard.width = BILLBOARD_SIZE;
         billboard.height = BILLBOARD_SIZE;
-        billboard.scaleByDistance = new NearFarScalar(2414016, 1.0, 1.6093e+7, 0.1);
+        billboard.scaleByDistance = new NearFarScalar(BILLBOARD_NEAR_DISTANCE, BILLBOARD_NEAR_RATIO, BILLBOARD_FAR_DISTANCE, BILLBOARD_FAR_RATIO);
+        billboard.pixelOffsetScaleByDistance = new NearFarScalar(BILLBOARD_NEAR_DISTANCE, BILLBOARD_NEAR_RATIO, BILLBOARD_FAR_DISTANCE, BILLBOARD_FAR_RATIO);
         return billboard;
     }
 
@@ -602,7 +612,7 @@ define([
             y = 7 - Math.min(y / 32, 7);
             var iconNum = (8 * y) + x;
 
-            href = '//maps.google.com/mapfiles/kml/pal' + palette + '/icon' + iconNum + '.png';
+            href = 'https://maps.google.com/mapfiles/kml/pal' + palette + '/icon' + iconNum + '.png';
         }
 
         href = resolveHref(href, dataSource._proxy, sourceUri, uriResolver);
@@ -663,7 +673,7 @@ define([
         }
 
         //GE treats a heading of zero as no heading
-        //Yes, this means it's impossible to actually point north in KML
+        //You can still point north using a 360 degree angle (or any multiple of 360)
         if (defined(heading) && heading !== 0) {
             billboard.rotation = CesiumMath.toRadians(-heading);
             billboard.alignedAxis = Cartesian3.UNIT_Z;
@@ -818,10 +828,16 @@ define([
         //Google earth seems to always use the first external style only.
         var externalStyle = queryStringValue(placeMark, 'styleUrl', namespaces.kml);
         if (defined(externalStyle)) {
-            //Google Earth ignores leading and trailing whitespace for styleUrls
-            //Without the below trim, some docs that load in Google Earth won't load
-            //in cesium.
             var id = externalStyle;
+            if (externalStyle[0] !== '#' && externalStyle.indexOf('#') !== -1) {
+                var tokens = externalStyle.split('#');
+                var uri = tokens[0];
+                if (defined(sourceUri)) {
+                    uri = getAbsoluteUri(uri, getAbsoluteUri(sourceUri));
+                }
+                id = uri + '#' + tokens[1];
+            }
+            
             styleEntity = styleCollection.getById(id);
             if (!defined(styleEntity)) {
                 styleEntity = styleCollection.getById('#' + id);
@@ -836,7 +852,7 @@ define([
 
     //Asynchronously processes an external style file.
     function processExternalStyles(dataSource, uri, styleCollection) {
-        return when(loadXML(proxyUrl(uri, dataSource._proxy)), function(styleKml) {
+        return when(RequestScheduler.request(proxyUrl(uri, dataSource._proxy), loadXML), function(styleKml) {
             return processStyles(dataSource, styleKml, styleCollection, uri, true);
         });
     }
@@ -894,7 +910,15 @@ define([
 
                                 var styleUrl = queryStringValue(pair, 'styleUrl', namespaces.kml);
                                 if (defined(styleUrl)) {
-                                    var base = styleCollection.getOrCreateEntity(styleUrl);
+                                    if (styleUrl[0] !== '#') {
+                                        styleUrl = '#' + styleUrl;
+                                    }
+
+                                    if (isExternal && defined(sourceUri)) {
+                                        styleUrl = sourceUri + styleUrl;
+                                    }
+                                    var base = styleCollection.getById(styleUrl);
+
                                     if (defined(base)) {
                                         styleEntity.merge(base);
                                     }
@@ -1604,6 +1628,8 @@ define([
             }
 
             geometry.material = href;
+            geometry.material.color = queryColorValue(groundOverlay, 'color', namespaces.kml);
+            geometry.material.transparent = true;
         } else {
             geometry.material = queryColorValue(groundOverlay, 'color', namespaces.kml);
         }
@@ -1692,7 +1718,7 @@ define([
             return value;
         }
 
-        if (defined(camera)) {
+        if (defined(camera) && camera._mode !== SceneMode.MORPHING) {
             var wgs84 = Ellipsoid.WGS84;
             var centerCartesian;
             var centerCartographic;
@@ -1815,7 +1841,7 @@ define([
                 var queryString = makeQueryString(viewFormat, httpQuery);
 
                 var networkLinkCollection = new EntityCollection();
-                var linkUrl = processNetworkLinkQueryString(dataSource._camera, dataSource._canvas, joinUrls(href, '?' + queryString, false),
+                var linkUrl = processNetworkLinkQueryString(dataSource._camera, dataSource._canvas, joinUrls(href, queryString, false),
                                                             viewBoundScale, dataSource._lastCameraView.bbox);
 
                 var promise = when(load(dataSource, networkLinkCollection, linkUrl), function(rootElement) {
@@ -2015,7 +2041,7 @@ define([
 
         var promise = data;
         if (typeof data === 'string') {
-            promise = loadBlob(proxyUrl(data, dataSource._proxy));
+            promise = RequestScheduler.request(proxyUrl(data, dataSource._proxy), loadBlob);
             sourceUri = defaultValue(sourceUri, data);
         }
 

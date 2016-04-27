@@ -16,6 +16,7 @@ define([
         '../Core/loadJsonp',
         '../Core/Math',
         '../Core/Rectangle',
+        '../Core/RequestScheduler',
         '../Core/RuntimeError',
         '../Core/TileProviderError',
         '../Core/WebMercatorProjection',
@@ -41,6 +42,7 @@ define([
         loadJsonp,
         CesiumMath,
         Rectangle,
+        RequestScheduler,
         RuntimeError,
         TileProviderError,
         WebMercatorProjection,
@@ -109,9 +111,9 @@ define([
      *
      * @example
      * var esri = new Cesium.ArcGisMapServerImageryProvider({
-     *     url: '//services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
+     *     url : 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer'
      * });
-     * 
+     *
      * @see {@link http://resources.esri.com/help/9.3/arcgisserver/apis/rest/|ArcGIS Server REST API}
      * @see {@link http://www.w3.org/TR/cors/|Cross-Origin Resource Sharing}
      */
@@ -184,8 +186,8 @@ define([
 
                             var projection = new WebMercatorProjection();
                             var extent = data.fullExtent;
-                            var sw = projection.unproject(new Cartesian3(Math.max(extent.xmin, -Ellipsoid.WGS84.maximumRadius * Math.PI), Math.max(extent.ymin, -Ellipsoid.WGS84.maximumRadius * Math.PI), 0.0));
-                            var ne = projection.unproject(new Cartesian3(Math.min(extent.xmax, Ellipsoid.WGS84.maximumRadius * Math.PI), Math.min(extent.ymax, Ellipsoid.WGS84.maximumRadius * Math.PI), 0.0));
+                            var sw = projection.unproject(new Cartesian3(Math.max(extent.xmin, -that._tilingScheme.ellipsoid.maximumRadius * Math.PI), Math.max(extent.ymin, -that._tilingScheme.ellipsoid.maximumRadius * Math.PI), 0.0));
+                            var ne = projection.unproject(new Cartesian3(Math.min(extent.xmax, that._tilingScheme.ellipsoid.maximumRadius * Math.PI), Math.min(extent.ymax, that._tilingScheme.ellipsoid.maximumRadius * Math.PI), 0.0));
                             that._rectangle = new Rectangle(sw.longitude, sw.latitude, ne.longitude, ne.latitude);
                         } else if (data.fullExtent.spatialReference.wkid === 4326) {
                             that._rectangle = Rectangle.fromDegrees(data.fullExtent.xmin, data.fullExtent.ymin, data.fullExtent.xmax, data.fullExtent.ymax);
@@ -235,7 +237,7 @@ define([
                 parameters.token = that._token;
             }
 
-            var metadata = loadJsonp(that._url, {
+            var metadata = RequestScheduler.request(that._url, loadJsonp, {
                 parameters : parameters,
                 proxy : that._proxy
             });
@@ -585,6 +587,7 @@ define([
      * @param {Number} x The tile X coordinate.
      * @param {Number} y The tile Y coordinate.
      * @param {Number} level The tile level.
+     * @param {Number} [distance] The distance of the tile from the camera, used to prioritize requests.
      * @returns {Promise.<Image|Canvas>|undefined} A promise for the image that will resolve when the image is available, or
      *          undefined if there are too many active requests to the server, and the request
      *          should be retried later.  The resolved image may be either an
@@ -592,7 +595,7 @@ define([
      *
      * @exception {DeveloperError} <code>requestImage</code> must not be called before the imagery provider is ready.
      */
-    ArcGisMapServerImageryProvider.prototype.requestImage = function(x, y, level) {
+    ArcGisMapServerImageryProvider.prototype.requestImage = function(x, y, level, distance) {
         //>>includeStart('debug', pragmas.debug);
         if (!this._ready) {
             throw new DeveloperError('requestImage must not be called before the imagery provider is ready.');
@@ -600,7 +603,7 @@ define([
         //>>includeEnd('debug');
 
         var url = buildImageUrl(this, x, y, level);
-        return ImageryProvider.loadImage(this, url);
+        return ImageryProvider.loadImage(this, url, distance);
     };
 
     /**

@@ -536,6 +536,8 @@ define([
         scratchCartographic.height = surfaceTile.maximumHeight; // TODO: just for example.
         var southwestCartesian = ellipsoid.cartographicToCartesian(scratchCartographic, scratchCartesian4);
 
+        // TODO: This next test only works if the closest tiles are tested first. Can we guarantee that?
+
         // Must compute for every view:
         // - Determine appropriate projection matrix - use Camera method, which requires a position, a view direction and an “up” direction;
         //     we want to make sure the up direction is “up” relative to the ellipsoid.
@@ -582,9 +584,33 @@ define([
         var positionScreenSpace = SceneTransforms.clipToGLWindowCoordinates(viewport, positionClip, scratchCartesian2);
         // Note that SceneTransforms.wgs84ToWindowCoordinates would finish with a positionScreenSpace.y = canvas.clientHeight - positionScreenSpace.y.
 
-        if (tile.x < 2 && tile.y < 2) { // just log some results
-            console.log('tile L' + tile.level + ' X' + tile.x + ' Y' + tile.y, scratchCartographic, southwestCartesian, positionScreenSpace);
+        // if (tile.x < 2 && tile.y < 2) { // just log some results
+        //     console.log('tile L' + tile.level + ' X' + tile.x + ' Y' + tile.y, scratchCartographic, southwestCartesian, positionScreenSpace);
+        // }
+
+        // Test if the projection of the plane horizontal to this tile at its maximum height would be visible on the screen given the frameState.horizonMinimumScreenHeight.
+        var xInteger = Math.round(positionScreenSpace.x);
+        var yInteger = Math.round(positionScreenSpace.y);
+        if (positionScreenSpace.x >= 0 && positionScreenSpace.x < viewport.width && positionScreenSpace.y > 0) {
+            // TODO: in fact, need to stretch this out.
+            if (yInteger > (frameState.horizonMinimumScreenHeight[xInteger] || 0)) {
+                console.log('tile L' + tile.level + ' X' + tile.x + ' Y' + tile.y, 'visible at screen x', xInteger, 'because', positionScreenSpace.y, '>', frameState.horizonMinimumScreenHeight[xInteger]);
+            }
         }
+
+        // Update frameState.horizonMinimumScreenHeight with the projection of the plane horizontal to this tile at its minimum height.
+        // (To occlude future tiles.)
+        //
+        // TODO: replace height with tile's minimum height.
+        if (positionScreenSpace.x >= 0 && positionScreenSpace.x < viewport.width && positionScreenSpace.y > 0) {
+            // TODO: in fact, need to stretch this out.
+            frameState.horizonMinimumScreenHeight[xInteger] = yInteger;
+        }
+
+
+
+        // TODO: Need to reset horizonMinimumScreenHeight when the view (camera) changes.
+
 
         // var scene = camera._scene;
         // var positionScreenSpace = SceneTransforms.wgs84ToWindowCoordinates(scene, positionWorld, scratchCartesian2);

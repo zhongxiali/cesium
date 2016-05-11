@@ -162,6 +162,14 @@ define([
         * @type {Number}
         */
         this.terrainExaggeration = 1.0;
+
+        /**
+         * An array whose ith value gives the screen y-coordinate of the horizon (in pixels) of the screen x-coordinate i (in pixels).
+         * TODO: Optimize. Eg. Use a typed array.
+         * TODO: Handle changing screen widths.
+         * @type {Number[]}
+         */
+        this.horizonMinimumScreenHeight = [];
     }
 
     /**

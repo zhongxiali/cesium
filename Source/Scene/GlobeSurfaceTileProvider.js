@@ -1,10 +1,12 @@
 /*global define*/
 define([
+        '../Core/BoundingRectangle', // Added by RacingTadpole.
         '../Core/BoundingSphere',
         '../Core/BoxOutlineGeometry',
         '../Core/Cartesian2',
         '../Core/Cartesian3',
         '../Core/Cartesian4',
+        '../Core/Cartographic', // Added by RacingTadpole.
         '../Core/Color',
         '../Core/ColorGeometryInstanceAttribute',
         '../Core/defaultValue',
@@ -38,6 +40,7 @@ define([
         '../Scene/Pass',
         '../Scene/PerInstanceColorAppearance',
         '../Scene/Primitive',
+        '../Scene/SceneTransforms', // Added by RacingTadpole.
         '../ThirdParty/when',
         './GlobeSurfaceTile',
         './ImageryLayer',
@@ -45,11 +48,13 @@ define([
         './QuadtreeTileLoadState',
         './SceneMode'
     ], function(
+        BoundingRectangle, // Added by RacingTadpole.
         BoundingSphere,
         BoxOutlineGeometry,
         Cartesian2,
         Cartesian3,
         Cartesian4,
+        Cartographic, // Added by RacingTadpole.
         Color,
         ColorGeometryInstanceAttribute,
         defaultValue,
@@ -83,6 +88,7 @@ define([
         Pass,
         PerInstanceColorAppearance,
         Primitive,
+        SceneTransforms, // Added by RacingTadpole.
         when,
         GlobeSurfaceTile,
         ImageryLayer,
@@ -442,6 +448,12 @@ define([
     };
 
     var boundingSphereScratch = new BoundingSphere();
+    var upViewMatrix = new Matrix4();
+    var scratchCartesian2 = new Cartesian2();
+    var scratchCartesian3 = new Cartesian3();
+    var scratchCartesian4 = new Cartesian4();
+    var scratchViewport = new BoundingRectangle();
+    var scratchCartographic = new Cartographic();
 
     /**
      * Determines the visibility of a given tile.  The tile may be fully visible, partially visible, or not
@@ -450,7 +462,7 @@ define([
      *
      * @param {QuadtreeTile} tile The tile instance.
      * @param {FrameState} frameState The state information about the current frame.
-     * @param {QuadtreeOccluders} occluders The objects that may occlude this tile.
+     * @param {QuadtreeOccluders} occluders The objects that may occlude this tile. TODO: won't need this any more?
      *
      * @returns {Visibility} The visibility of the tile.
      */
@@ -484,18 +496,89 @@ define([
             return Visibility.NONE;
         }
 
-        if (frameState.mode === SceneMode.SCENE3D) {
-            var occludeePointInScaledSpace = surfaceTile.occludeePointInScaledSpace;
-            if (!defined(occludeePointInScaledSpace)) {
-                return intersection;
-            }
-
-            if (occluders.ellipsoid.isScaledSpacePointVisible(occludeePointInScaledSpace)) {
-                return intersection;
-            }
-
-            return Visibility.NONE;
+        if (frameState.mode !== SceneMode.SCENE3D) {
+            return intersection;
         }
+
+        // Test for horizon culling (in 3D only) as follows:
+        // Can precompute:
+        // - Min/max planes for each tile, taking into account the min/max heights relative to the min/max distance of the tile from the ellipsoid.
+        // - Bounding lines from these planes, taking into account the fact that lines of latitude are curved, so the boundaries need to either include or exclude these curves.
+
+        var camera = frameState.camera;
+        var ellipsoid = camera._projection.ellipsoid;
+
+        scratchCartesian4.w = 1;
+        Rectangle.southwest(tile.rectangle, scratchCartographic);
+        scratchCartographic.height = surfaceTile.maximumHeight; // TODO: just for example.
+        var southwestCartesian = ellipsoid.cartographicToCartesian(scratchCartographic, scratchCartesian4);
+
+        // Must compute for every view:
+        // - Determine appropriate projection matrix - use Camera method, which requires a position, a view direction and an “up” direction;
+        //     we want to make sure the up direction is “up” relative to the ellipsoid.
+        // - Project the edges onto the screen coordinates
+        // - Test the lines against a 1D buffer containing the height of the current horizon (relative to the ellipsoid).
+
+        // Logic from Camera's private updateViewMatrix function.
+        function setUpViewMatrix(right, up, direction, position) {
+            upViewMatrix[0] = right.x;
+            upViewMatrix[1] = up.x;
+            upViewMatrix[2] = -direction.x;
+            upViewMatrix[3] = 0.0;
+            upViewMatrix[4] = right.y;
+            upViewMatrix[5] = up.y;
+            upViewMatrix[6] = -direction.y;
+            upViewMatrix[7] = 0.0;
+            upViewMatrix[8] = right.z;
+            upViewMatrix[9] = up.z;
+            upViewMatrix[10] = -direction.z;
+            upViewMatrix[11] = 0.0;
+            upViewMatrix[12] = -Cartesian3.dot(right, position);
+            upViewMatrix[13] = -Cartesian3.dot(up, position);
+            upViewMatrix[14] = Cartesian3.dot(direction, position);
+            upViewMatrix[15] = 1.0;
+        }
+        var up = new Cartesian3();
+        up = ellipsoid.geodeticSurfaceNormal(camera.position, up);
+        setUpViewMatrix(camera.right, up, camera.direction, camera.position);
+
+        // Following the logic in PointPrimitive._computeScreenSpacePosition.
+        // Convert from local model to world coordinates. In fact, we're already in world coordinates here.
+        var positionWorld = southwestCartesian; // In general, would need: Matrix4.multiplyByVector(modelMatrix, theCartesian, scratchCartesian4);
+        // Convert from world to view coordinates. Modify the viewMatrix so that up is normal to the ellipsoid. (Would normally use camera.viewMatrix.)
+        var positionEC = Matrix4.multiplyByVector(upViewMatrix, positionWorld, scratchCartesian4);
+        // Convert from view to clip coordinates.
+        var positionClip = Matrix4.multiplyByVector(camera.frustum.projectionMatrix, positionEC, scratchCartesian4);
+        // Convert from clip to screen coordinates.
+        var canvas = camera._scene.canvas;
+        var viewport = scratchViewport;
+        viewport.x = 0;
+        viewport.y = 0;
+        viewport.width = canvas.clientWidth;
+        viewport.height = canvas.clientHeight;
+        var positionScreenSpace = SceneTransforms.clipToGLWindowCoordinates(viewport, positionClip, scratchCartesian2);
+        // Note that SceneTransforms.wgs84ToWindowCoordinates would finish with a positionScreenSpace.y = canvas.clientHeight - positionScreenSpace.y.
+
+        if (tile.x < 2 && tile.y < 2) { // just log some results
+            console.log('tile L' + tile.level + ' X' + tile.x + ' Y' + tile.y, scratchCartographic, southwestCartesian, positionScreenSpace);
+        }
+
+        // var scene = camera._scene;
+        // var positionScreenSpace = SceneTransforms.wgs84ToWindowCoordinates(scene, positionWorld, scratchCartesian2);
+
+        // This is the old occludee point approach.
+        // if (frameState.mode === SceneMode.SCENE3D) {
+        //     var occludeePointInScaledSpace = surfaceTile.occludeePointInScaledSpace;
+        //     if (!defined(occludeePointInScaledSpace)) {
+        //         return intersection;
+        //     }
+
+        //     if (occluders.ellipsoid.isScaledSpacePointVisible(occludeePointInScaledSpace)) {
+        //         return intersection;
+        //     }
+
+        //     return Visibility.NONE;
+        // }
 
         return intersection;
     };

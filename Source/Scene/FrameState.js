@@ -1,8 +1,10 @@
 /*global define*/
 define([
-        './SceneMode'
+        './SceneMode',
+        '../Core/Matrix4'
     ], function(
-        SceneMode) {
+        SceneMode,
+        Matrix4) {
     'use strict';
 
     /**
@@ -205,9 +207,17 @@ define([
          * An array whose ith value gives the screen y-coordinate of the horizon (in pixels) of the screen x-coordinate i (in pixels).
          * TODO: Optimize. Eg. Use a typed array.
          * TODO: Handle changing screen widths.
+         * TODO: Reset when view changes.
          * @type {Number[]}
          */
         this.horizonMinimumScreenHeight = [];
+
+        /**
+         * The view matrix, recalculated so that "up" is normal to the surface of the ellipsoid.
+         * TODO: Reset when view changes.
+         * @type {Number[]}
+         */
+        this.normalUpViewMatrix = new Matrix4();
     }
 
     /**

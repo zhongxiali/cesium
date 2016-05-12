@@ -447,13 +447,54 @@ define([
         GlobeSurfaceTile.processStateMachine(tile, frameState, this._terrainProvider, this._imageryLayers);
     };
 
+    var hasViewChanged = true;  // TODO: set to true to force recalculation of frameState's normalUpViewMatrix and horizonMinimumScreenHeight.
+    var hasViewportChanged = true;  // TODO: set to true to force recalculation of viewport.
+    var viewport = new BoundingRectangle();
+
     var boundingSphereScratch = new BoundingSphere();
-    var upViewMatrix = new Matrix4();
     var scratchCartesian2 = new Cartesian2();
     var scratchCartesian3 = new Cartesian3();
     var scratchCartesian4 = new Cartesian4();
-    var scratchViewport = new BoundingRectangle();
     var scratchCartographic = new Cartographic();
+
+
+    // As per Camera's (private) updateViewMatrix function.
+    function setViewMatrix(viewMatrix, right, up, direction, position) {
+        viewMatrix[0] = right.x;
+        viewMatrix[1] = up.x;
+        viewMatrix[2] = -direction.x;
+        viewMatrix[3] = 0.0;
+        viewMatrix[4] = right.y;
+        viewMatrix[5] = up.y;
+        viewMatrix[6] = -direction.y;
+        viewMatrix[7] = 0.0;
+        viewMatrix[8] = right.z;
+        viewMatrix[9] = up.z;
+        viewMatrix[10] = -direction.z;
+        viewMatrix[11] = 0.0;
+        viewMatrix[12] = -Cartesian3.dot(right, position);
+        viewMatrix[13] = -Cartesian3.dot(up, position);
+        viewMatrix[14] = Cartesian3.dot(direction, position);
+        viewMatrix[15] = 1.0;
+    }
+
+    function updateNormalUpViewMatrix(ellipsoid, camera, frameState) {
+        var up = ellipsoid.geodeticSurfaceNormal(camera.position, scratchCartesian3);
+        setViewMatrix(frameState.normalUpViewMatrix, camera.right, up, camera.direction, camera.position);
+    }
+
+    // Convert the world position (Cartesian3) to the screen-space position (Cartesian2).
+    // Store the result in 'result'.
+    function computePositionScreenSpace(positionWorld, viewMatrix, projectionMatrix, viewport, result) {
+        // Following the logic in PointPrimitive._computeScreenSpacePosition.
+        // Convert from world to view coordinates.
+        var positionEC = Matrix4.multiplyByVector(viewMatrix, positionWorld, scratchCartesian4);
+        // Convert from view to clip coordinates.
+        var positionClip = Matrix4.multiplyByVector(projectionMatrix, positionEC, scratchCartesian4);
+        // Convert from clip to screen coordinates.
+        // Note that SceneTransforms.wgs84ToWindowCoordinates would finish with a positionScreenSpace.y = canvas.clientHeight - positionScreenSpace.y.
+        return SceneTransforms.clipToGLWindowCoordinates(viewport, positionClip, result);
+    }
 
     /**
      * Determines the visibility of a given tile.  The tile may be fully visible, partially visible, or not
@@ -508,11 +549,6 @@ define([
         var camera = frameState.camera;
         var ellipsoid = camera._projection.ellipsoid;
 
-        scratchCartesian4.w = 1;
-        Rectangle.southwest(tile.rectangle, scratchCartographic);
-        scratchCartographic.height = surfaceTile.maximumHeight; // TODO: just for example.
-        var southwestCartesian = ellipsoid.cartographicToCartesian(scratchCartographic, scratchCartesian4);
-
         // TODO: This next test only works if the closest tiles are tested first. Can we guarantee that?
 
         // Must compute for every view:
@@ -521,45 +557,30 @@ define([
         // - Project the edges onto the screen coordinates
         // - Test the lines against a 1D buffer containing the height of the current horizon (relative to the ellipsoid).
 
-        // Logic from Camera's private updateViewMatrix function.
-        function setUpViewMatrix(right, up, direction, position) {
-            upViewMatrix[0] = right.x;
-            upViewMatrix[1] = up.x;
-            upViewMatrix[2] = -direction.x;
-            upViewMatrix[3] = 0.0;
-            upViewMatrix[4] = right.y;
-            upViewMatrix[5] = up.y;
-            upViewMatrix[6] = -direction.y;
-            upViewMatrix[7] = 0.0;
-            upViewMatrix[8] = right.z;
-            upViewMatrix[9] = up.z;
-            upViewMatrix[10] = -direction.z;
-            upViewMatrix[11] = 0.0;
-            upViewMatrix[12] = -Cartesian3.dot(right, position);
-            upViewMatrix[13] = -Cartesian3.dot(up, position);
-            upViewMatrix[14] = Cartesian3.dot(direction, position);
-            upViewMatrix[15] = 1.0;
+        if (hasViewChanged) {
+            updateNormalUpViewMatrix(ellipsoid, camera, frameState);
+            for (var k = 0; k < frameState.horizonMinimumScreenHeight.length; k++) {
+                frameState.horizonMinimumScreenHeight[k] = 0;
+            }
+            hasViewChanged = false;
         }
-        var up = new Cartesian3();
-        up = ellipsoid.geodeticSurfaceNormal(camera.position, up);
-        setUpViewMatrix(camera.right, up, camera.direction, camera.position);
 
-        // Following the logic in PointPrimitive._computeScreenSpacePosition.
-        // Convert from local model to world coordinates. In fact, we're already in world coordinates here.
-        var positionWorld = southwestCartesian; // In general, would need: Matrix4.multiplyByVector(modelMatrix, theCartesian, scratchCartesian4);
-        // Convert from world to view coordinates. Modify the viewMatrix so that up is normal to the ellipsoid. (Would normally use camera.viewMatrix.)
-        var positionEC = Matrix4.multiplyByVector(upViewMatrix, positionWorld, scratchCartesian4);
-        // Convert from view to clip coordinates.
-        var positionClip = Matrix4.multiplyByVector(camera.frustum.projectionMatrix, positionEC, scratchCartesian4);
-        // Convert from clip to screen coordinates.
-        var canvas = camera._scene.canvas;
-        var viewport = scratchViewport;
-        viewport.x = 0;
-        viewport.y = 0;
-        viewport.width = canvas.clientWidth;
-        viewport.height = canvas.clientHeight;
-        var positionScreenSpace = SceneTransforms.clipToGLWindowCoordinates(viewport, positionClip, scratchCartesian2);
-        // Note that SceneTransforms.wgs84ToWindowCoordinates would finish with a positionScreenSpace.y = canvas.clientHeight - positionScreenSpace.y.
+        if (hasViewportChanged) {
+            var canvas = camera._scene.canvas;
+            viewport.x = 0;
+            viewport.y = 0;
+            viewport.width = canvas.clientWidth;
+            viewport.height = canvas.clientHeight;
+            hasViewportChanged = false;
+        }
+
+        scratchCartesian4.w = 1;
+        Rectangle.southwest(tile.rectangle, scratchCartographic);
+        scratchCartographic.height = surfaceTile.maximumHeight; // TODO: just for example.
+        var southwestCartesian = ellipsoid.cartographicToCartesian(scratchCartographic, scratchCartesian4);
+
+        var positionWorld = southwestCartesian;
+        var positionScreenSpace = computePositionScreenSpace(positionWorld, frameState.normalUpViewMatrix, camera.frustum.projectionMatrix, viewport, scratchCartesian2);
 
         // if (tile.x < 2 && tile.y < 2) { // just log some results
         //     console.log('tile L' + tile.level + ' X' + tile.x + ' Y' + tile.y, scratchCartographic, southwestCartesian, positionScreenSpace);

@@ -470,12 +470,15 @@ define([
         GlobeSurfaceTile.processStateMachine(tile, frameState, this._terrainProvider, this._imageryLayers, this._vertexArraysToDestroy);
     };
 
-    var hasViewChanged = true;  // TODO: set to true to force recalculation of frameState's normalUpViewMatrix and horizonMinimumScreenHeight.
-    var hasViewportChanged = true;  // TODO: set to true to force recalculation of viewport.
+    var hasViewChanged = true;
+    var hasViewportChanged = true;
     var viewport = new BoundingRectangle();
 
     var boundingSphereScratch = new BoundingSphere();
-    var scratchCartesian2 = new Cartesian2();
+    var corner1 = new Cartesian2();
+    var corner2 = new Cartesian2();
+    var corner3 = new Cartesian2();
+    var corner4 = new Cartesian2();
     var scratchCartesian3 = new Cartesian3();
     var scratchCartesian4 = new Cartesian4();
     var scratchCartographic = new Cartographic();
@@ -501,14 +504,16 @@ define([
         viewMatrix[15] = 1.0;
     }
 
-    function updateNormalUpViewMatrix(ellipsoid, camera, frameState) {
+    function updateNormalUpViewMatrix(frameState) {
+        var camera = frameState.camera;
+        var ellipsoid = camera._projection.ellipsoid;
         var up = ellipsoid.geodeticSurfaceNormal(camera.position, scratchCartesian3);
         setViewMatrix(frameState.normalUpViewMatrix, camera.right, up, camera.direction, camera.position);
     }
 
-    // Convert the world position (Cartesian3) to the screen-space position (Cartesian2).
+    // Convert the world position (Cartesian4) to the screen-space position (Cartesian2).
     // Store the result in 'result'.
-    function computePositionScreenSpace(positionWorld, viewMatrix, projectionMatrix, viewport, result) {
+    function computeScreenSpacePosition(positionWorld, viewMatrix, projectionMatrix, result) {
         // Following the logic in PointPrimitive._computeScreenSpacePosition.
         // Convert from world to view coordinates.
         var positionEC = Matrix4.multiplyByVector(viewMatrix, positionWorld, scratchCartesian4);
@@ -519,6 +524,145 @@ define([
         return SceneTransforms.clipToGLWindowCoordinates(viewport, positionClip, result);
     }
 
+    function scratchCartographicToScreenSpacePosition(frameState, result) {
+        var camera = frameState.camera;
+        var ellipsoid = camera._projection.ellipsoid;
+        // cartographicToCartesian returns a Cartesian3, but we'll need a Cartesian4, so use Cartesian4 and set w = 1.
+        var positionWorld = ellipsoid.cartographicToCartesian(scratchCartographic, scratchCartesian4);
+        positionWorld.w = 1;
+        return computeScreenSpacePosition(positionWorld, frameState.normalUpViewMatrix, camera.frustum.projectionMatrix, result);
+    }
+
+    // Calculate the corners of the tile in screen-space coordinates, at a given height above the tile.
+    function setCorners(tile, height, frameState) {
+        // Calculate a single corner of the tile in screen-space coordinates, at a given height above the tile.
+        // Specify which corner by passing in a Rectangle method via cornerMethod, eg. Rectangle.southwest.
+        function setCorner(cornerMethod, corner) {
+            cornerMethod(tile.rectangle, scratchCartographic);
+            scratchCartographic.height = height;
+            scratchCartographicToScreenSpacePosition(frameState, corner);
+        }
+        setCorner(Rectangle.southwest, corner1);
+        setCorner(Rectangle.southeast, corner2);
+        setCorner(Rectangle.northwest, corner3);
+        setCorner(Rectangle.northeast, corner4);
+    }
+
+    function cornersSortedByX() {
+        return [corner1, corner2, corner3, corner4].sort(function(a, b) {
+            return (corner1.x - corner2.x);
+        });
+    }
+
+    // function interpolate(x, x1, x2, y1, y2) {
+    //     if (x1 === x2) {
+    //         return (y1 + y2) / 2;
+    //     }
+    //     return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
+    // }
+
+    // Interpolating between two points, when x increases by 1, how much does y increase?
+    function calculateYIncrement(x1, x2, y1, y2) {
+        if (x1 === x2) {
+            return 0;
+        }
+        return (y2 - y1) / (x2 - x1);
+    }
+
+    function isVisibileAboveMinimumHorizon(tile, frameState) {
+        var surfaceTile = tile.data;
+        setCorners(tile, surfaceTile.maximumHeight, frameState);
+        var corners = cornersSortedByX();
+
+        // The two internal y's may either both be the same, or one will be below the other. We only want the higher of the two.
+        var internalY = Math.max(corners[1].y, corners[2].y);
+
+        var xInteger, y, yIncrement;
+        if (corners[0].x > viewport.width) {
+            return false;
+        }
+        if (corners[1].x > 0) {
+            y = corners[0].y;
+            yIncrement = calculateYIncrement(corners[0].x, corners[1].x, corners[0].y, internalY);
+            for (xInteger = Math.round(corners[0].x); xInteger < Math.round(corners[1].x); xInteger++) {
+                if (xInteger >= 0 && y > (frameState.horizonMinimumScreenHeight[xInteger] || 0)) {
+                    return true;
+                }
+                y = y + yIncrement;
+            }
+        }
+        if (corners[1].x > viewport.width) {
+            return false;
+        }
+        if (corners[2].x > 0) {
+            for (xInteger = Math.round(corners[1].x); xInteger < Math.round(corners[2].x); xInteger++) {
+                if (xInteger >= 0 && internalY > (frameState.horizonMinimumScreenHeight[xInteger] || 0)) {
+                    return true;
+                }
+            }
+        }
+        if (corners[2].x > viewport.width) {
+            return false;
+        }
+        if (corners[3].x > 0) {
+            y = internalY;
+            yIncrement = calculateYIncrement(corners[2].x, corners[3].x, internalY, corners[3].y);
+            for (xInteger = Math.round(corners[2].x); xInteger < Math.round(corners[3].x); xInteger++) {
+                if (xInteger >= 0 && y > (frameState.horizonMinimumScreenHeight[xInteger] || 0)) {
+                    return true;
+                }
+                y = y + yIncrement;
+            }
+        }
+        return false;
+    }
+
+    function updateMinimumHorizon(tile, frameState) {
+        var surfaceTile = tile.data;
+        setCorners(tile, surfaceTile.minimumHeight, frameState);
+        var corners = cornersSortedByX();
+        // The two internal y's may either both be the same, or one will be below the other. We only want the higher of the two.
+        var internalY = Math.max(corners[1].y, corners[2].y);
+
+        var xInteger, y, yIncrement;
+        if (corners[0].x > viewport.width) {
+            return false;
+        }
+        if (corners[1].x > 0) {
+            y = corners[0].y;
+            yIncrement = calculateYIncrement(corners[0].x, corners[1].x, corners[0].y, internalY);
+            for (xInteger = Math.round(corners[0].x); xInteger < Math.round(corners[1].x); xInteger++) {
+                if (xInteger >= 0 && y > (frameState.horizonMinimumScreenHeight[xInteger] || 0)) {
+                    frameState.horizonMinimumScreenHeight[xInteger] = Math.round(y);
+                }
+                y = y + yIncrement;
+            }
+        }
+        if (corners[1].x > viewport.width) {
+            return false;
+        }
+        if (corners[2].x > 0) {
+            y = Math.round(internalY);
+            for (xInteger = Math.round(corners[1].x); xInteger < Math.round(corners[2].x); xInteger++) {
+                if (xInteger >= 0 && internalY > (frameState.horizonMinimumScreenHeight[xInteger] || 0)) {
+                    frameState.horizonMinimumScreenHeight[xInteger] = y;
+                }
+            }
+        }
+        if (corners[2].x > viewport.width) {
+            return false;
+        }
+        if (corners[3].x > 0) {
+            y = internalY;
+            yIncrement = calculateYIncrement(corners[2].x, corners[3].x, internalY, corners[3].y);
+            for (xInteger = Math.round(corners[2].x); xInteger < Math.round(corners[3].x); xInteger++) {
+                if (xInteger >= 0 && y > (frameState.horizonMinimumScreenHeight[xInteger] || 0)) {
+                    frameState.horizonMinimumScreenHeight[xInteger] = Math.round(y);
+                }
+                y = y + yIncrement;
+            }
+        }
+    }
     /**
      * Determines the visibility of a given tile.  The tile may be fully visible, partially visible, or not
      * visible at all.  Tiles that are renderable and are at least partially visible will be shown by a call
@@ -569,19 +713,21 @@ define([
         // - Min/max planes for each tile, taking into account the min/max heights relative to the min/max distance of the tile from the ellipsoid.
         // - Bounding lines from these planes, taking into account the fact that lines of latitude are curved, so the boundaries need to either include or exclude these curves.
 
-        var camera = frameState.camera;
-        var ellipsoid = camera._projection.ellipsoid;
-
-        // TODO: This next test only works if the closest tiles are tested first. Can we guarantee that?
-
         // Must compute for every view:
         // - Determine appropriate projection matrix - use Camera method, which requires a position, a view direction and an “up” direction;
         //     we want to make sure the up direction is “up” relative to the ellipsoid.
         // - Project the edges onto the screen coordinates
         // - Test the lines against a 1D buffer containing the height of the current horizon (relative to the ellipsoid).
 
+        // TODO: Precompute what we can.
+        // TODO: Only works if the closest tiles are tested first. Can we guarantee that?
+        // TODO: Need to reset horizonMinimumScreenHeight when the view (camera) changes.
+        // TODO: Take into account the fact that lines of latitude are curved.
+        // TODO: set hasViewChanged to true when view changes, to force recalculation of frameState's normalUpViewMatrix and horizonMinimumScreenHeight.
+        // TODO: set hasViewportChanged to true when the canvas dimensions change.
+
         if (hasViewChanged) {
-            updateNormalUpViewMatrix(ellipsoid, camera, frameState);
+            updateNormalUpViewMatrix(frameState);
             for (var k = 0; k < frameState.horizonMinimumScreenHeight.length; k++) {
                 frameState.horizonMinimumScreenHeight[k] = 0;
             }
@@ -589,7 +735,7 @@ define([
         }
 
         if (hasViewportChanged) {
-            var canvas = camera._scene.canvas;
+            var canvas = frameState.camera._scene.canvas;
             viewport.x = 0;
             viewport.y = 0;
             viewport.width = canvas.clientWidth;
@@ -597,44 +743,14 @@ define([
             hasViewportChanged = false;
         }
 
-        scratchCartesian4.w = 1;
-        Rectangle.southwest(tile.rectangle, scratchCartographic);
-        scratchCartographic.height = surfaceTile.maximumHeight; // TODO: just for example.
-        var southwestCartesian = ellipsoid.cartographicToCartesian(scratchCartographic, scratchCartesian4);
+        var visible = isVisibileAboveMinimumHorizon(tile, frameState);
+        updateMinimumHorizon(tile, frameState);
 
-        var positionWorld = southwestCartesian;
-        var positionScreenSpace = computePositionScreenSpace(positionWorld, frameState.normalUpViewMatrix, camera.frustum.projectionMatrix, viewport, scratchCartesian2);
-
-        // if (tile.x < 2 && tile.y < 2) { // just log some results
-        //     console.log('tile L' + tile.level + ' X' + tile.x + ' Y' + tile.y, scratchCartographic, southwestCartesian, positionScreenSpace);
-        // }
-
-        // Test if the projection of the plane horizontal to this tile at its maximum height would be visible on the screen given the frameState.horizonMinimumScreenHeight.
-        var xInteger = Math.round(positionScreenSpace.x);
-        var yInteger = Math.round(positionScreenSpace.y);
-        if (positionScreenSpace.x >= 0 && positionScreenSpace.x < viewport.width && positionScreenSpace.y > 0) {
-            // TODO: in fact, need to stretch this out.
-            if (yInteger > (frameState.horizonMinimumScreenHeight[xInteger] || 0)) {
-                console.log('tile L' + tile.level + ' X' + tile.x + ' Y' + tile.y, 'visible at screen x', xInteger, 'because', positionScreenSpace.y, '>', frameState.horizonMinimumScreenHeight[xInteger]);
-            }
+        if (!visible) {
+            return Visibility.NONE;
+        } else {
+            return intersection;
         }
-
-        // Update frameState.horizonMinimumScreenHeight with the projection of the plane horizontal to this tile at its minimum height.
-        // (To occlude future tiles.)
-        //
-        // TODO: replace height with tile's minimum height.
-        if (positionScreenSpace.x >= 0 && positionScreenSpace.x < viewport.width && positionScreenSpace.y > 0) {
-            // TODO: in fact, need to stretch this out.
-            frameState.horizonMinimumScreenHeight[xInteger] = yInteger;
-        }
-
-
-
-        // TODO: Need to reset horizonMinimumScreenHeight when the view (camera) changes.
-
-
-        // var scene = camera._scene;
-        // var positionScreenSpace = SceneTransforms.wgs84ToWindowCoordinates(scene, positionWorld, scratchCartesian2);
 
         // This is the old occludee point approach.
         // if (frameState.mode === SceneMode.SCENE3D) {

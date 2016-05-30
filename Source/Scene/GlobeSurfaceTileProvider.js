@@ -534,13 +534,13 @@ define([
     }
 
     // Calculate the corners of the tile in screen-space coordinates, at a given height above the tile.
-    function setCorners(tile, height, frameState) {
+    function setCorners(tile, height, frameState, ellipsoid) {
         // Calculate a single corner of the tile in screen-space coordinates, at a given height above the tile.
         // Specify which corner by passing in a Rectangle method via cornerMethod, eg. Rectangle.southwest.
         function setCorner(cornerMethod, corner) {
             cornerMethod(tile.rectangle, scratchCartographic);
             scratchCartographic.height = height;
-            scratchCartographicToScreenSpacePosition(frameState, corner);
+            ellipsoid.cartographicToCartesian(scratchCartographic, corner);
         }
         setCorner(Rectangle.southwest, corner1);
         setCorner(Rectangle.southeast, corner2);
@@ -714,20 +714,29 @@ define([
             return intersection;
         }
 
-        var horizon = occluders.horizon;
-        var ellipsoid = horizon.ellipsoid;
+        // var horizon = occluders.horizon;
+        // var ellipsoid = horizon.ellipsoid;
 
-        setCorners(tile, surfaceTile.maximumHeight, frameState);
+        // setCorners(tile, surfaceTile.maximumHeight, frameState, ellipsoid);
 
-        if (horizon.testWorldSpaceLine(corner1, corner2) !== Visibility.NONE ||
-            horizon.testWorldSpaceLine(corner2, corner3) !== Visibility.NONE ||
-            horizon.testWorldSpaceLine(corner3, corner4) !== Visibility.NONE ||
-            horizon.testWorldSpaceLine(corner4, corner1) !== Visibility.NONE) {
+        // if (horizon.testWorldSpaceLine(corner1, corner2) !== Visibility.NONE ||
+        //     horizon.testWorldSpaceLine(corner2, corner3) !== Visibility.NONE ||
+        //     horizon.testWorldSpaceLine(corner3, corner4) !== Visibility.NONE ||
+        //     horizon.testWorldSpaceLine(corner4, corner1) !== Visibility.NONE) {
+
+        //     // TODO: this doesn't belong here.  showTileThisFrame makes more sense,
+        //     // but it happens too late.  The problem with here is we don't actually know
+        //     // if this tile will be shown yet.. it's children might be shown instead.
+        //     setCorners(tile, surfaceTile.minimumHeight, frameState, ellipsoid);
+        //     horizon.addWorldSpaceOcclusionLine(corner1, corner2);
+        //     horizon.addWorldSpaceOcclusionLine(corner2, corner3);
+        //     horizon.addWorldSpaceOcclusionLine(corner3, corner4);
+        //     horizon.addWorldSpaceOcclusionLine(corner4, corner1);
 
             return intersection;
-        } else {
-            return Visibility.NONE;
-        }
+        // } else {
+        //     return Visibility.NONE;
+        // }
 
         // Test for horizon culling (in 3D only) as follows:
         // Can precompute:
@@ -790,9 +799,17 @@ define([
         // return intersection;
     };
 
-    function testVisibilityAgainstHorizon(horizon, corner1, corner2) {
+    GlobeSurfaceTileProvider.prototype.markTileToBeRendered = function(tile, frameState, occluders) {
+        var surfaceTile = tile.data;
+        var horizon = occluders.horizon;
+        var ellipsoid = horizon.ellipsoid;
 
-    }
+        setCorners(tile, surfaceTile.minimumHeight, frameState, ellipsoid);
+        horizon.addWorldSpaceOcclusionLine(corner1, corner2);
+        horizon.addWorldSpaceOcclusionLine(corner2, corner3);
+        horizon.addWorldSpaceOcclusionLine(corner3, corner4);
+        horizon.addWorldSpaceOcclusionLine(corner4, corner1);
+    };
 
     var modifiedModelViewScratch = new Matrix4();
     var modifiedModelViewProjectionScratch = new Matrix4();

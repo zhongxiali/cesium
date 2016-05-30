@@ -141,6 +141,24 @@ define([
      * @param {Number} endY The Y coordinate of the end of the line.
      */
     HorizonOccluder.prototype.addScreenSpaceOcclusionLine = function(startX, startY, endX, endY) {
+        // We want increasing X values.
+        if (endX < startX) {
+            var tmp = startX;
+            startX = endX;
+            endX = tmp;
+            tmp = startY;
+            startY = endY;
+            endY = tmp;
+        }
+
+        if (endX < 0 || startX >= this._width) {
+            // Line is entirely outside the horizon buffer.
+            // TODO: test if startY and endY are less than zero, meaning tile is entirely below the screen?
+            //       Frustum culling will discard entirely non-visible tiles, but visible tiles might
+            //       still have non-visible lines.
+            return;
+        }
+
         var yIncrement = calculateYIncrement(startX, endX, startY, endY);
 
         var x = Math.round(startX) | 0;
@@ -153,10 +171,10 @@ define([
 
         var horizon = this._horizon;
 
-        var y = startY;
+        var y = startY + (endY - startY) * (x - startX) / (endX - startX);
         for (; x <= lastX; ++x) {
             var rounded = Math.round(y);
-            if (rounded > buffer[x]) {
+            if (rounded > horizon[x]) {
                 horizon[x] = rounded;
             }
             y += yIncrement;

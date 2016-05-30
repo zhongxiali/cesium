@@ -308,6 +308,8 @@ define([
         }
     };
 
+    var lastPath;
+
     /**
      * @private
      */
@@ -341,6 +343,29 @@ define([
                 debug.lastMaxDepth = debug.maxDepth;
                 debug.lastTilesWaitingForChildren = debug.tilesWaitingForChildren;
             }
+        }
+
+        if (lastPath) {
+            lastPath.remove();
+            lastPath = undefined;
+        }
+
+        var horizon = this._occluders.horizon._horizon;
+        if (horizon) {
+            var svg = document.getElementById('horizon');
+            lastPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            lastPath.setAttribute('stroke', 'red');
+            lastPath.setAttribute('fill', 'none');
+
+            var height = frameState.context.drawingBufferHeight;
+            var path = 'M0 ' + (height - horizon[0] - 1) + ' ';
+
+            for (var i = 1; i < horizon.length; ++i) {
+                path += 'L' + i + ' ' + (height - horizon[i] - 1) + ' ';
+            }
+
+            lastPath.setAttribute('d', path);
+            svg.appendChild(lastPath);
         }
     };
 
@@ -476,7 +501,7 @@ define([
 
             if (screenSpaceError(primitive, frameState, tile) < primitive.maximumScreenSpaceError) {
                 // This tile meets SSE requirements, so render it.
-                addTileToRenderList(primitive, tile);
+                addTileToRenderList(primitive, frameState, tile);
             } else if (queueChildrenLoadAndDetermineIfChildrenAreAllRenderable(primitive, tile)) {
                 // SSE is not good enough and children are loaded, so refine.
                 var children = tile.children;
@@ -490,7 +515,7 @@ define([
                 }
             } else {
                 // SSE is not good enough but not all children are loaded, so render this tile anyway.
-                addTileToRenderList(primitive, tile);
+                addTileToRenderList(primitive, frameState, tile);
             }
         }
 
@@ -543,7 +568,8 @@ define([
         return maxGeometricError / pixelSize;
     }
 
-    function addTileToRenderList(primitive, tile) {
+    function addTileToRenderList(primitive, frameState, tile) {
+        primitive._tileProvider.markTileToBeRendered(tile, frameState, primitive._occluders);
         primitive._tilesToRender.push(tile);
         ++primitive._debug.tilesRendered;
     }

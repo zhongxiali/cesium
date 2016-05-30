@@ -412,6 +412,12 @@ define([
         }
 
         primitive._occluders.ellipsoid.cameraPosition = frameState.camera.positionWC;
+        primitive._occluders.horizon.updateCamera(
+            frameState.camera.frustum.projectionMatrix,
+            frameState.camera.positionWC,
+            frameState.camera.directionWC,
+            frameState.context.drawingBufferWidth,
+            frameState.context.drawingBufferHeight);
 
         var tileProvider = primitive._tileProvider;
         var occluders = primitive._occluders;

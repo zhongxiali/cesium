@@ -2,11 +2,13 @@
 define([
         '../Core/Cartesian3',
         '../Core/defineProperties',
-        '../Core/EllipsoidalOccluder'
+        '../Core/EllipsoidalOccluder',
+        '../Core/HorizonOccluder',
     ], function(
         Cartesian3,
         defineProperties,
-        EllipsoidalOccluder) {
+        EllipsoidalOccluder,
+        HorizonOccluder) {
     'use strict';
 
     /**
@@ -33,6 +35,18 @@ define([
         ellipsoid : {
             get : function() {
                 return this._ellipsoid;
+            }
+        },
+
+        /**
+         * Gets the {@link HorizonOccluder} that can be used to determine if a point is occluded
+         * by the horizon.
+         * @type {HorizonOccluder}
+         * @memberof QuadtreeOccluders.prototype
+         */
+        horizon : {
+            get : function() {
+                return this._horizon;
             }
         }
     });

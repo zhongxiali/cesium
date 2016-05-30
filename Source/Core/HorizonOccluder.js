@@ -1,14 +1,20 @@
 /*global define*/
 define([
-        '../Core/Cartesian3',
-        '../Core/defaultValue',
-        '../Core/defined',
-        '../Core/Ellipsoid',
-        '../Core/Matrix4'
+        './Cartesian2',
+        './Cartesian3',
+        './Cartesian4',
+        './defaultValue',
+        './defined',
+        './defineProperties',
+        './Ellipsoid',
+        './Matrix4'
     ], function(
+        Cartesian2,
         Cartesian3,
+        Cartesian4,
         defaultValue,
         defined,
+        defineProperties,
         Ellipsoid,
         Matrix4) {
     'use strict';
@@ -28,21 +34,20 @@ define([
      * @param {Number} options.height The height of the horizon buffer.  Typically, this is the height of the drawing buffer in pixels.
      */
     function HorizonOccluder(options) {
-        //>>includeStart('debug', pragmas.debug);
-        if (!defined(options) || !defined(options.width)) {
-            throw new DeveloperError('options.width is required.');
-        }
-        if (!defined(options.height)) {
-            throw new DeveloperError('options.height is required.');
-        }
-        //>>includeEnd('debug');
+        options = options || {};
 
-        this._width = options.width;
-        this._height = options.height;
         this._ellipsoid = defaultValue(options.ellipsoid, Ellipsoid.WGS84);
-        this._horizon = new Int16Array(options.width);
+        this._horizon = undefined;
         this._worldToClipMatrix = new Matrix4();
     }
+
+    defineProperties(HorizonOccluder.prototype, {
+        ellipsoid : {
+            get: function() {
+                return this._ellipsoid;
+            }
+        }
+    });
 
     // Test for horizon culling (in 3D only) as follows:
     // Can precompute:
@@ -72,9 +77,34 @@ define([
      * @param {Cartesian3} position The position of the camera in ECEF coordinates.
      * @param {Cartesian3} direction The look direction of the camera in the ECEF axes.
      */
-    HorizonOccluder.prototype.updateCamera = function(projectionMatrix, position, direction) {
+    HorizonOccluder.prototype.updateCamera = function(projectionMatrix, position, direction, width, height) {
+        //>>includeStart('debug', pragmas.debug);
+        if (!defined(projectionMatrix)) {
+            throw new DeveloperError('projectionMatrix is required');
+        }
+        if (!defined(position)) {
+            throw new DeveloperError('position is required');
+        }
+        if (!defined(direction)) {
+            throw new DeveloperError('direction is required');
+        }
+        if (!defined(width)) {
+            throw new DeveloperError('width is required');
+        }
+        if (!defined(height)) {
+            throw new DeveloperError('height is required');
+        }
+        //>>includeEnd('debug');
+
         // TODO: what happens when we're looking straight down?
         // TODO: used cached matrix when position/direction don't change.
+
+        this._width = width;
+        this._height = height;
+
+        if (!this._horizon || this._horizon.length !== width) {
+            this._horizon = new Int16Array(width);
+        }
 
         var surfaceNormal = this._ellipsoid.geodeticSurfaceNormal(position, rightScratch);
         var right = Cartesian3.cross(direction, surfaceNormal, rightScratch);
@@ -83,7 +113,7 @@ define([
         var viewMatrix = Matrix4.computeView(position, direction, up, right, this._worldToClipMatrix);
         this._worldToClipMatrix = Matrix4.multiply(projectionMatrix, viewMatrix, this._worldToClipMatrix);
 
-        this._buffer.fill(0);
+        this._horizon.fill(0);
     };
 
     var startClipScratch = new Cartesian2();
@@ -96,9 +126,9 @@ define([
      * @param {Cartesian3} endPosition The end position of the line in ECEF coordinates.
      */
     HorizonOccluder.prototype.addWorldSpaceOcclusionLine = function(startPosition, endPosition) {
-        var startClip = this.transformWorldCoordinatesToNdc(startPosition, startClipScratch);
-        var endClip = this.transformWorldCoordinatesToNdc(startPosition, endClipScratch);
-        this.addNdcOcclusionLine(startClip.x, startClip.y, endClip.x, endClip.y);
+        var startClip = this.transformWorldCoordinatesToDrawingBuffer(startPosition, startClipScratch);
+        var endClip = this.transformWorldCoordinatesToDrawingBuffer(endPosition, endClipScratch);
+        this.addScreenSpaceOcclusionLine(startClip.x, startClip.y, endClip.x, endClip.y);
     };
 
     /**
@@ -121,13 +151,13 @@ define([
         lastX = Math.max(lastX, 0);
         lastX = Math.min(lastX, this._width - 1);
 
-        var buffer = this._buffer;
+        var horizon = this._horizon;
 
         var y = startY;
         for (; x <= lastX; ++x) {
             var rounded = Math.round(y);
             if (rounded > buffer[x]) {
-                buffer[x] = rounded;
+                horizon[x] = rounded;
             }
             y += yIncrement;
         }
@@ -141,9 +171,9 @@ define([
      * @return {Visibility} The visibility status of the line.
      */
     HorizonOccluder.prototype.testWorldSpaceLine = function(startPosition, endPosition) {
-        var startClip = this.transformWorldCoordinatesToNdc(startPosition, startClipScratch);
-        var endClip = this.transformWorldCoordinatesToNdc(startPosition, endClipScratch);
-        return this.testNdcOcclusionLine(startClip.x, startClip.y, endClip.x, endClip.y);
+        var startClip = this.transformWorldCoordinatesToDrawingBuffer(startPosition, startClipScratch);
+        var endClip = this.transformWorldCoordinatesToDrawingBuffer(endPosition, endClipScratch);
+        return this.testScreenSpaceOcclusionLine(startClip.x, startClip.y, endClip.x, endClip.y);
     };
 
     /**
@@ -166,11 +196,11 @@ define([
         lastX = Math.max(lastX, 0);
         lastX = Math.min(lastX, this._width - 1);
 
-        var buffer = this._buffer;
+        var horizon = this._horizon;
 
-        var y = startY;
+        var y = startY + (endY - startY) * (x - startX) / (endX - startX);
         for (; x <= lastX; ++x) {
-            if (y > buffer[x]) {
+            if (y > horizon[x]) {
                 return true;
             }
             y += yIncrement;

@@ -129,6 +129,9 @@ define([
         var eastNormal = Cartesian3.cross(Cartesian3.UNIT_Z, easternMidpointCartesian, cartesian3Scratch);
         Cartesian3.normalize(eastNormal, tileBB.eastNormal);
 
+        // TODO: these computations don't account for the fact that lines of constant
+        //       latitude bulge toward the equator.
+
         // Compute the normal of the plane bounding the southern edge of the tile.
         var southeastCornerNormal = ellipsoid.geodeticSurfaceNormalCartographic(Rectangle.southeast(rectangle), cartesian3Scratch2);
         var westVector = Cartesian3.subtract(westernMidpointCartesian, easternMidpointCartesian, cartesian3Scratch);

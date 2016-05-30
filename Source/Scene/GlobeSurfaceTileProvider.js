@@ -544,8 +544,8 @@ define([
         }
         setCorner(Rectangle.southwest, corner1);
         setCorner(Rectangle.southeast, corner2);
-        setCorner(Rectangle.northwest, corner3);
-        setCorner(Rectangle.northeast, corner4);
+        setCorner(Rectangle.northeast, corner3);
+        setCorner(Rectangle.northwest, corner4);
     }
 
     function cornersSortedByX() {
@@ -663,6 +663,12 @@ define([
             }
         }
     }
+
+    var scratchPosition1 = new Cartesian3();
+    var scratchPosition2 = new Cartesian3();
+    var scratchPosition3 = new Cartesian3();
+    var scratchPosition4 = new Cartesian3();
+
     /**
      * Determines the visibility of a given tile.  The tile may be fully visible, partially visible, or not
      * visible at all.  Tiles that are renderable and are at least partially visible will be shown by a call
@@ -708,6 +714,21 @@ define([
             return intersection;
         }
 
+        var horizon = occluders.horizon;
+        var ellipsoid = horizon.ellipsoid;
+
+        setCorners(tile, surfaceTile.maximumHeight, frameState);
+
+        if (horizon.testWorldSpaceLine(corner1, corner2) !== Visibility.NONE ||
+            horizon.testWorldSpaceLine(corner2, corner3) !== Visibility.NONE ||
+            horizon.testWorldSpaceLine(corner3, corner4) !== Visibility.NONE ||
+            horizon.testWorldSpaceLine(corner4, corner1) !== Visibility.NONE) {
+
+            return intersection;
+        } else {
+            return Visibility.NONE;
+        }
+
         // Test for horizon culling (in 3D only) as follows:
         // Can precompute:
         // - Min/max planes for each tile, taking into account the min/max heights relative to the min/max distance of the tile from the ellipsoid.
@@ -726,31 +747,31 @@ define([
         // TODO: set hasViewChanged to true when view changes, to force recalculation of frameState's normalUpViewMatrix and horizonMinimumScreenHeight.
         // TODO: set hasViewportChanged to true when the canvas dimensions change.
 
-        if (hasViewChanged) {
-            updateNormalUpViewMatrix(frameState);
-            for (var k = 0; k < frameState.horizonMinimumScreenHeight.length; k++) {
-                frameState.horizonMinimumScreenHeight[k] = 0;
-            }
-            hasViewChanged = false;
-        }
+        // if (hasViewChanged) {
+        //     updateNormalUpViewMatrix(frameState);
+        //     for (var k = 0; k < frameState.horizonMinimumScreenHeight.length; k++) {
+        //         frameState.horizonMinimumScreenHeight[k] = 0;
+        //     }
+        //     hasViewChanged = false;
+        // }
 
-        if (hasViewportChanged) {
-            var canvas = frameState.camera._scene.canvas;
-            viewport.x = 0;
-            viewport.y = 0;
-            viewport.width = canvas.clientWidth;
-            viewport.height = canvas.clientHeight;
-            hasViewportChanged = false;
-        }
+        // if (hasViewportChanged) {
+        //     var canvas = frameState.camera._scene.canvas;
+        //     viewport.x = 0;
+        //     viewport.y = 0;
+        //     viewport.width = canvas.clientWidth;
+        //     viewport.height = canvas.clientHeight;
+        //     hasViewportChanged = false;
+        // }
 
-        var visible = isVisibileAboveMinimumHorizon(tile, frameState);
-        updateMinimumHorizon(tile, frameState);
+        // var visible = isVisibileAboveMinimumHorizon(tile, frameState);
+        // updateMinimumHorizon(tile, frameState);
 
-        if (!visible) {
-            return Visibility.NONE;
-        } else {
-            return intersection;
-        }
+        // if (!visible) {
+        //     return Visibility.NONE;
+        // } else {
+        //     return intersection;
+        // }
 
         // This is the old occludee point approach.
         // if (frameState.mode === SceneMode.SCENE3D) {
@@ -766,8 +787,12 @@ define([
         //     return Visibility.NONE;
         // }
 
-        return intersection;
+        // return intersection;
     };
+
+    function testVisibilityAgainstHorizon(horizon, corner1, corner2) {
+
+    }
 
     var modifiedModelViewScratch = new Matrix4();
     var modifiedModelViewProjectionScratch = new Matrix4();
@@ -1169,7 +1194,7 @@ define([
         var enableFog = frameState.fog.enabled;
         var castShadows = tileProvider.castShadows;
         var receiveShadows = tileProvider.receiveShadows;
-        
+
         if (showReflectiveOcean) {
             --maxTextures;
         }

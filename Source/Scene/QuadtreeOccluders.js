@@ -20,6 +20,7 @@ define([
      */
     function QuadtreeOccluders(options) {
         this._ellipsoid = new EllipsoidalOccluder(options.ellipsoid, Cartesian3.ZERO);
+        this._horizon = new HorizonOccluder();
     }
 
     defineProperties(QuadtreeOccluders.prototype, {

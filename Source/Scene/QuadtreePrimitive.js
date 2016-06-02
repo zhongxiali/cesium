@@ -441,6 +441,7 @@ define([
             frameState.camera.frustum.projectionMatrix,
             frameState.camera.positionWC,
             frameState.camera.directionWC,
+            //40, 40);
             frameState.context.drawingBufferWidth,
             frameState.context.drawingBufferHeight);
 
@@ -499,7 +500,7 @@ define([
             // This one doesn't load children unless we refine to them.
             // We may want to revisit this in the future.
 
-            if (screenSpaceError(primitive, frameState, tile) < primitive.maximumScreenSpaceError) {
+            if (tile.level >= 7 || screenSpaceError(primitive, frameState, tile) < primitive.maximumScreenSpaceError) {
                 // This tile meets SSE requirements, so render it.
                 addTileToRenderList(primitive, frameState, tile);
             } else if (queueChildrenLoadAndDetermineIfChildrenAreAllRenderable(primitive, tile)) {

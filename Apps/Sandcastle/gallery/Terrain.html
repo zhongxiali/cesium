@@ -51,6 +51,8 @@ var cesiumTerrainProviderMeshes = new Cesium.CesiumTerrainProvider({
 });
 viewer.terrainProvider = cesiumTerrainProviderMeshes;
 
+viewer.imageryLayers.addImageryProvider(new Cesium.TileCoordinatesImageryProvider());
+
 // setup alternative terrain providers
 var ellipsoidProvider = new Cesium.EllipsoidTerrainProvider();
 

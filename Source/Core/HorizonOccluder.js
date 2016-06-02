@@ -116,8 +116,8 @@ define([
         this._horizon.fill(0);
     };
 
-    var startClipScratch = new Cartesian2();
-    var endClipScratch = new Cartesian2();
+    var startClipScratch = new Cartesian3();
+    var endClipScratch = new Cartesian3();
 
     /**
      * Adds a world-space line to the horizon.  Anything below this line will be considered occluded.
@@ -128,7 +128,7 @@ define([
     HorizonOccluder.prototype.addWorldSpaceOcclusionLine = function(startPosition, endPosition) {
         var startClip = this.transformWorldCoordinatesToDrawingBuffer(startPosition, startClipScratch);
         var endClip = this.transformWorldCoordinatesToDrawingBuffer(endPosition, endClipScratch);
-        this.addScreenSpaceOcclusionLine(startClip.x, startClip.y, endClip.x, endClip.y);
+        this.addScreenSpaceOcclusionLine(startClip.x, startClip.y, startClip.z, endClip.x, endClip.y, endClip.z);
     };
 
     /**
@@ -140,7 +140,7 @@ define([
      * @param {Number} endX The X coordinate of the end of the line.
      * @param {Number} endY The Y coordinate of the end of the line.
      */
-    HorizonOccluder.prototype.addScreenSpaceOcclusionLine = function(startX, startY, endX, endY) {
+    HorizonOccluder.prototype.addScreenSpaceOcclusionLine = function(startX, startY, startZ, endX, endY, endZ) {
         // We want increasing X values.
         if (endX < startX) {
             var tmp = startX;
@@ -149,6 +149,9 @@ define([
             tmp = startY;
             startY = endY;
             endY = tmp;
+            tmp = startZ;
+            startZ = endZ;
+            endZ = tmp;
         }
 
         if (endX < 0 || startX >= this._width) {
@@ -160,6 +163,7 @@ define([
         }
 
         var yIncrement = calculateYIncrement(startX, endX, startY, endY);
+        var zIncrement = calculateYIncrement(startX, endX, startZ, endZ);
 
         var x = Math.round(startX) | 0;
         x = Math.max(x, 0);
@@ -171,13 +175,18 @@ define([
 
         var horizon = this._horizon;
 
-        var y = startY + (endY - startY) * (x - startX) / (endX - startX);
+        var fraction = (x - startX) / (endX - startX)
+        var y = startY + (endY - startY) * fraction;
+        var z = startZ + (endZ - startZ) * fraction;
         for (; x <= lastX; ++x) {
-            var rounded = Math.round(y);
-            if (rounded > horizon[x]) {
-                horizon[x] = rounded;
+            if (z > -1.0 && z < 1.0) {
+                var rounded = Math.round(y);
+                if (rounded > horizon[x]) {
+                    horizon[x] = rounded;
+                }
             }
             y += yIncrement;
+            z += zIncrement;
         }
     };
 
@@ -191,7 +200,7 @@ define([
     HorizonOccluder.prototype.testWorldSpaceLine = function(startPosition, endPosition) {
         var startClip = this.transformWorldCoordinatesToDrawingBuffer(startPosition, startClipScratch);
         var endClip = this.transformWorldCoordinatesToDrawingBuffer(endPosition, endClipScratch);
-        return this.testScreenSpaceOcclusionLine(startClip.x, startClip.y, endClip.x, endClip.y);
+        return this.testScreenSpaceOcclusionLine(startClip.x, startClip.y, startClip.z, endClip.x, endClip.y, endClip.z);
     };
 
     /**
@@ -232,12 +241,13 @@ define([
     HorizonOccluder.prototype.transformWorldCoordinatesToDrawingBuffer = function(position, result) {
         // Transform endpoints to clip coordinates
         Cartesian4.fromElements(position.x, position.y, position.z, 1.0, transformWorldToDrawingBufferScratch);
-        var startClip = Matrix4.multiplyByVector(this._worldToClipMatrix, transformWorldToDrawingBufferScratch, transformWorldToDrawingBufferScratch);
+        var clip = Matrix4.multiplyByVector(this._worldToClipMatrix, transformWorldToDrawingBufferScratch, transformWorldToDrawingBufferScratch);
 
-        // Transform to normalized device coordinates with perspective divide, and transform to drawing buffer coordinates.
-        return Cartesian2.fromElements(
-            (startClip.x / startClip.w + 1.0) * 0.5 * this._width,
-            (startClip.y / startClip.w + 1.0) * 0.5 * this._height,
+        // Transform to normalized device coordinates with perspective divide.
+        return Cartesian3.fromElements(
+            (clip.x / clip.w + 1.0) * 0.5 * this._width,
+            (clip.y / clip.w + 1.0) * 0.5 * this._height,
+            clip.z / clip.w,
             result);
     };
 

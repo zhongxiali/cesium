@@ -802,22 +802,14 @@ define([
     GlobeSurfaceTileProvider.prototype.markTileToBeRendered = function(tile, frameState, occluders) {
         var surfaceTile = tile.data;
 
-        // if (surfaceTile.loadedTerrain) {
-        //     return undefined;
-        // }
-
-        if (tile.level !== 7 || tile.x !== 189 || tile.y !== 44) {
-            return;
-        }
-
         var horizon = occluders.horizon;
         var ellipsoid = horizon.ellipsoid;
 
         setCorners(tile, surfaceTile.minimumHeight, frameState, ellipsoid);
-        // horizon.addWorldSpaceOcclusionLine(corner1, corner2);
+        horizon.addWorldSpaceOcclusionLine(corner1, corner2);
         horizon.addWorldSpaceOcclusionLine(corner2, corner3);
-        // horizon.addWorldSpaceOcclusionLine(corner3, corner4);
-        // horizon.addWorldSpaceOcclusionLine(corner4, corner1);
+        horizon.addWorldSpaceOcclusionLine(corner3, corner4);
+        horizon.addWorldSpaceOcclusionLine(corner4, corner1);
     };
 
     var modifiedModelViewScratch = new Matrix4();

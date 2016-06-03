@@ -500,7 +500,7 @@ define([
             // This one doesn't load children unless we refine to them.
             // We may want to revisit this in the future.
 
-            if (tile.level >= 7 || screenSpaceError(primitive, frameState, tile) < primitive.maximumScreenSpaceError) {
+            if (screenSpaceError(primitive, frameState, tile) < primitive.maximumScreenSpaceError) {
                 // This tile meets SSE requirements, so render it.
                 addTileToRenderList(primitive, frameState, tile);
             } else if (queueChildrenLoadAndDetermineIfChildrenAreAllRenderable(primitive, tile)) {

@@ -39,6 +39,8 @@ define([
         this._ellipsoid = defaultValue(options.ellipsoid, Ellipsoid.WGS84);
         this._horizon = undefined;
         this._worldToClipMatrix = new Matrix4();
+        this._width = 1;
+        this._height = 1;
     }
 
     defineProperties(HorizonOccluder.prototype, {
@@ -188,9 +190,14 @@ define([
      * @return {Visibility} The visibility status of the line.
      */
     HorizonOccluder.prototype.testWorldSpaceLine = function(startPosition, endPosition) {
-        var startClip = this.transformWorldCoordinatesToDrawingBuffer(startPosition, startClipScratch);
-        var endClip = this.transformWorldCoordinatesToDrawingBuffer(endPosition, endClipScratch);
-        return this.testScreenSpaceOcclusionLine(startClip.x, startClip.y, startClip.z, endClip.x, endClip.y, endClip.z);
+        var startClip = this.transformWorldCoordinatesToClip(startPosition, startClipScratch);
+        var endClip = this.transformWorldCoordinatesToClip(endPosition, endClipScratch);
+        if (this.clipLineSegment(startClip, endClip)) {
+            var startScreen = this.transformClipCoordinatesToDrawingBuffer(startClip, startScreenScratch);
+            var endScreen = this.transformClipCoordinatesToDrawingBuffer(endClip, endScreenScratch);
+            return this.testScreenSpaceOcclusionLine(startScreen.x, startScreen.y, endScreen.x, endScreen.y);
+        }
+        return true;
     };
 
     /**
@@ -201,8 +208,19 @@ define([
      * @param {Number} startY The Y coordinate of the start of the line.
      * @param {Number} endX The X coordinate of the end of the line.
      * @param {Number} endY The Y coordinate of the end of the line.
+     * @returns {Boolean} true if any part of the line is visible; otherwise, false.
      */
     HorizonOccluder.prototype.testScreenSpaceOcclusionLine = function(startX, startY, endX, endY) {
+        // We want increasing X values.
+        if (endX < startX) {
+            var tmp = startX;
+            startX = endX;
+            endX = tmp;
+            tmp = startY;
+            startY = endY;
+            endY = tmp;
+        }
+
         var yIncrement = calculateYIncrement(startX, endX, startY, endY);
 
         var x = Math.round(startX) | 0;
@@ -215,7 +233,8 @@ define([
 
         var horizon = this._horizon;
 
-        var y = startY + (endY - startY) * (x - startX) / (endX - startX);
+        var fraction = (x - startX) / (endX - startX)
+        var y = startY + (endY - startY) * fraction;
         for (; x <= lastX; ++x) {
             if (y > horizon[x]) {
                 return true;
@@ -257,10 +276,10 @@ define([
     HorizonOccluder.prototype.clipLineSegment = function(start, end) {
         // See "Clipping Using Homogeneous Coordinates", James F. Blinn and Martin E. Newell
         // http://research.microsoft.com/pubs/73937/p245-blinn.pdf
-        return clip(start, end, start.w + start.x, end.w + end.x) &&
-               clip(start, end, start.w - start.x, end.w - end.x) &&
-               clip(start, end, start.w + start.y, end.w + end.y) &&
-               clip(start, end, start.w - start.y, end.w - end.y);
+        return clip(start, end, start.w + start.x, end.w + end.x) && // left
+               clip(start, end, start.w - start.x, end.w - end.x) && // right
+               clip(start, end, start.w + start.y, end.w + end.y); // && // bottom
+               //clip(start, end, start.w - start.y, end.w - end.y);   // top
     };
 
     function clip(start, end, boundaryCoordinate1, boundaryCoordinate2) {

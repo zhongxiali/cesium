@@ -95,7 +95,7 @@ define([
         var ellipsoid = tilingScheme.ellipsoid;
 
         this._tilesToRender = [];
-        this._tileTraversalQueue = new Queue();
+        this._tileTraversalStack = [];
         this._tileLoadQueue = [];
         this._tileReplacementQueue = new TileReplacementQueue();
         this._levelZeroTiles = undefined;
@@ -352,16 +352,25 @@ define([
 
         var horizon = this._occluders.horizon._horizon;
         if (horizon) {
+            var width = horizon.length;
+            var height = this._occluders.horizon._height;
+
             var svg = document.getElementById('horizon');
             lastPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             lastPath.setAttribute('stroke', 'red');
             lastPath.setAttribute('fill', 'none');
 
-            var height = frameState.context.drawingBufferHeight;
-            var path = 'M0 ' + (height - horizon[0] - 1) + ' ';
+            var windowHeight = frameState.context.drawingBufferHeight;
+            var windowWidth = frameState.context.drawingBufferWidth;
+
+            function horizonToWindow(value) {
+                return CesiumMath.lerp(windowHeight - 1, 0, value / (height - 1));
+            }
+
+            var path = 'M0 ' + horizonToWindow(horizon[0]) + ' ';
 
             for (var i = 1; i < horizon.length; ++i) {
-                path += 'L' + i + ' ' + (height - horizon[i] - 1) + ' ';
+                path += 'L' + i * windowWidth / width + ' ' + horizonToWindow(horizon[i]) + ' ';
             }
 
             lastPath.setAttribute('d', path);
@@ -409,6 +418,18 @@ define([
         this._tileProvider = this._tileProvider && this._tileProvider.destroy();
     };
 
+    // 0: northwest
+    // 1: northeast
+    // 2: southwest
+    // 3: southeast
+
+    var traversalOrder = [
+        [0, 2, 1, 3], // northwest quadrant: NW, SW, NE, SE
+        [1, 0, 3, 2], // northeast quadrant, NE, NW, SE, SW
+        [2, 0, 3, 1], // southwest quadrant: SW, NW, SE, NE
+        [3, 2, 1, 0]  // southeast quadrante: SE, SW, NE, NW
+    ];
+
     function selectTilesForRendering(primitive, frameState) {
         var debug = primitive._debug;
         if (debug.suspendLodUpdate) {
@@ -422,8 +443,8 @@ define([
         var tilesToRender = primitive._tilesToRender;
         tilesToRender.length = 0;
 
-        var traversalQueue = primitive._tileTraversalQueue;
-        traversalQueue.clear();
+        var traversalStack = primitive._tileTraversalStack;
+        traversalStack.length = 0;
 
         // We can't render anything before the level zero tiles exist.
         if (!defined(primitive._levelZeroTiles)) {
@@ -444,6 +465,8 @@ define([
             //40, 40);
             frameState.context.drawingBufferWidth,
             frameState.context.drawingBufferHeight);
+
+        var cameraPosition = frameState.camera.positionCartographic;
 
         var tileProvider = primitive._tileProvider;
         var occluders = primitive._occluders;
@@ -473,7 +496,7 @@ define([
                 queueTileLoad(primitive, tile);
             }
             if (tile.renderable && tileProvider.computeTileVisibility(tile, frameState, occluders) !== Visibility.NONE) {
-                traversalQueue.enqueue(tile);
+                traversalStack.push(tile);
             } else {
                 ++debug.tilesCulled;
                 if (!tile.renderable) {
@@ -486,7 +509,7 @@ define([
         // This ordering allows us to load bigger, lower-detail tiles before smaller, higher-detail ones.
         // This maximizes the average detail across the scene and results in fewer sharp transitions
         // between very different LODs.
-        while (defined((tile = traversalQueue.dequeue()))) {
+        while (defined((tile = traversalStack.pop()))) {
             ++debug.tilesVisited;
 
             primitive._tileReplacementQueue.markTileRendered(tile);
@@ -504,12 +527,28 @@ define([
                 // This tile meets SSE requirements, so render it.
                 addTileToRenderList(primitive, frameState, tile);
             } else if (queueChildrenLoadAndDetermineIfChildrenAreAllRenderable(primitive, tile)) {
+                var centerLongitude = tile.children[0].rectangle.east;
+                var centerLatitude = tile.children[0].rectangle.south;
+
+                var traversalIndex = 0;
+                if (cameraPosition.longitude > centerLongitude) {
+                    // Camera in eastern half
+                    traversalIndex += 1;
+                }
+
+                if (cameraPosition.latitude < centerLatitude) {
+                  // Camera in southern half
+                  traversalIndex += 2;
+                }
+
                 // SSE is not good enough and children are loaded, so refine.
                 var children = tile.children;
+                var traversal = traversalOrder[traversalIndex];
                 // PERFORMANCE_IDEA: traverse children front-to-back so we can avoid sorting by distance later.
-                for (i = 0, len = children.length; i < len; ++i) {
-                    if (tileProvider.computeTileVisibility(children[i], frameState, occluders) !== Visibility.NONE) {
-                        traversalQueue.enqueue(children[i]);
+                for (i = traversal.length - 1; i >= 0; --i) {
+                    var child = children[traversal[i]];
+                    if (tileProvider.computeTileVisibility(child, frameState, occluders) !== Visibility.NONE) {
+                        traversalStack.push(child);
                     } else {
                         ++debug.tilesCulled;
                     }

@@ -714,29 +714,22 @@ define([
             return intersection;
         }
 
-        // var horizon = occluders.horizon;
-        // var ellipsoid = horizon.ellipsoid;
+        var horizon = occluders.horizon;
+        var ellipsoid = horizon.ellipsoid;
 
-        // setCorners(tile, surfaceTile.maximumHeight, frameState, ellipsoid);
+        setCorners(tile, surfaceTile.maximumHeight, frameState, ellipsoid);
 
-        // if (horizon.testWorldSpaceLine(corner1, corner2) !== Visibility.NONE ||
-        //     horizon.testWorldSpaceLine(corner2, corner3) !== Visibility.NONE ||
-        //     horizon.testWorldSpaceLine(corner3, corner4) !== Visibility.NONE ||
-        //     horizon.testWorldSpaceLine(corner4, corner1) !== Visibility.NONE) {
-
-        //     // TODO: this doesn't belong here.  showTileThisFrame makes more sense,
-        //     // but it happens too late.  The problem with here is we don't actually know
-        //     // if this tile will be shown yet.. it's children might be shown instead.
-        //     setCorners(tile, surfaceTile.minimumHeight, frameState, ellipsoid);
-        //     horizon.addWorldSpaceOcclusionLine(corner1, corner2);
-        //     horizon.addWorldSpaceOcclusionLine(corner2, corner3);
-        //     horizon.addWorldSpaceOcclusionLine(corner3, corner4);
-        //     horizon.addWorldSpaceOcclusionLine(corner4, corner1);
+        if (horizon.testWorldSpaceLine(corner1, corner2) ||
+            horizon.testWorldSpaceLine(corner2, corner3) ||
+            horizon.testWorldSpaceLine(corner3, corner4) ||
+            horizon.testWorldSpaceLine(corner4, corner1)) {
 
             return intersection;
-        // } else {
-        //     return Visibility.NONE;
-        // }
+        } else {
+            return Visibility.NONE;
+        }
+
+        // return intersection;
 
         // Test for horizon culling (in 3D only) as follows:
         // Can precompute:

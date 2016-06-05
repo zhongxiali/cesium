@@ -263,27 +263,31 @@ define([
                     var level = this.level + 1;
                     var x = this.x * 2;
                     var y = this.y * 2;
+                    // 0: northwest
+                    // 1: northeast
+                    // 2: southwest
+                    // 3: southeast
                     this._children = [new QuadtreeTile({
                         tilingScheme : tilingScheme,
-                        x : x,
+                        x : x,  // northwest
                         y : y,
                         level : level,
                         parent : this
                     }), new QuadtreeTile({
                         tilingScheme : tilingScheme,
-                        x : x + 1,
+                        x : x + 1, // northeast
                         y : y,
                         level : level,
                         parent : this
                     }), new QuadtreeTile({
                         tilingScheme : tilingScheme,
-                        x : x,
+                        x : x, // southwest
                         y : y + 1,
                         level : level,
                         parent : this
                     }), new QuadtreeTile({
                         tilingScheme : tilingScheme,
-                        x : x + 1,
+                        x : x + 1, // southeast
                         y : y + 1,
                         level : level,
                         parent : this

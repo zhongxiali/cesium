@@ -197,7 +197,7 @@ define([
             var endScreen = this.transformClipCoordinatesToDrawingBuffer(endClip, endScreenScratch);
             return this.testScreenSpaceOcclusionLine(startScreen.x, startScreen.y, endScreen.x, endScreen.y);
         }
-        return true;
+        return false;
     };
 
     /**

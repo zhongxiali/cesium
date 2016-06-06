@@ -714,6 +714,11 @@ define([
             return intersection;
         }
 
+        // Don't horizon cull level zero tiles.
+        if (tile.level <= 1) {
+            return intersection;
+        }
+
         var horizon = occluders.horizon;
         var ellipsoid = horizon.ellipsoid;
 

@@ -70,6 +70,7 @@ define([
 
     function selectTilesForRendering(primitive, frameState) {
         var rootTiles = primitive._rootTiles;
+        var cameraPosition = frameState.camera.positionCartographic;
 
         for (var i = 0, len = rootTiles.length; i < len; ++i) {
             var rootTile = rootTiles[i];
@@ -77,15 +78,14 @@ define([
             queueForHighPriorityLoad(primitive, rootTile);
 
             if (rootTile.isLoaded()) {
-                selectTilesDepthFirst(primitive, frameState, rootTile);
+                selectTilesDepthFirst(primitive, frameState, rootTile, CullingVolume.MASK_INDETERMINATE, cameraPosition);
             }
         }
     }
 
-    function selectTilesDepthFirst(primitive, frameState, tile, clippingPlaneMask) {
+    function selectTilesDepthFirst(primitive, frameState, tile, clippingPlaneMask, cameraPosition) {
         // `tile` is guaranteed to be a skeleton - so we can cull it and compute SSE - but
-        // is not guaranteed to be fully loaded.  It is also already in a loading queue if it
-        // needs any loading.
+        // is not guaranteed to be fully loaded.
 
         var tileProvider = primitive._tileProvider;
         clippingPlaneMask = tileProvider.cullAgainstFrustum(tile, clippingPlaneMask);
@@ -129,15 +129,39 @@ define([
 
         // Children are all skeletons and this tile doesn't meet SSE, so refine.
         queueForLowPriorityLoad(primitive, tile);
-        recurseOnChildren(primitive, frameState, clippingPlaneMask, southwestChild, southeastChild, northwestChild, northeastChild);
+        recurseOnChildren(primitive, frameState, clippingPlaneMask, cameraPosition, southwestChild, southeastChild, northwestChild, northeastChild);
     }
 
-    function recurseOnChildren(primitive, frameState, clippingPlaneMask, southwest, southeast, northwest, northeast) {
-        // TODO: Call in near-to-far order
-        selectTilesDepthFirst(primitive, frameState, southwest, clippingPlaneMask);
-        selectTilesDepthFirst(primitive, frameState, southeast, clippingPlaneMask);
-        selectTilesDepthFirst(primitive, frameState, northwest, clippingPlaneMask);
-        selectTilesDepthFirst(primitive, frameState, northeast, clippingPlaneMask);
+    function recurseOnChildren(primitive, frameState, clippingPlaneMask, cameraPosition, southwest, southeast, northwest, northeast) {
+        if (cameraPosition.longitude < southwest.east) {
+            if (cameraPosition.latitude < southwest.north) {
+                // Camera in southwest quadrant
+                selectTilesDepthFirst(primitive, frameState, southwest, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, southeast, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, northwest, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, northeast, clippingPlaneMask, cameraPosition);
+            } else {
+                // Camera in northwest quadrant
+                selectTilesDepthFirst(primitive, frameState, northwest, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, southwest, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, northeast, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, southeast, clippingPlaneMask, cameraPosition);
+            }
+        } else {
+            if (cameraPosition.latitude < southwest.north) {
+                // Camera southeast quadrant
+                selectTilesDepthFirst(primitive, frameState, southeast, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, southwest, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, northeast, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, northwest, clippingPlaneMask, cameraPosition);
+            } else {
+                // Camera in northeast quadrant
+                selectTilesDepthFirst(primitive, frameState, northeast, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, northwest, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, southeast, clippingPlaneMask, cameraPosition);
+                selectTilesDepthFirst(primitive, frameState, southwest, clippingPlaneMask, cameraPosition);
+            }
+        }
     }
 
     function queueForSkeletonLoad(primitive, tile) {

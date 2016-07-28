@@ -116,9 +116,8 @@ define([
         var northeastChild = tile.getNortheastChild(tileProvider);
 
         if (!southwestChild.isSkeleton() || !southeastChild.isSkeleton() || !northwestChild.isSkeleton() || !northeastChild.isSkeleton()) {
-            // One or more children are not even skeletons, so we can't compute their distance or SSE; we really don't
-            // even know if they exist.  So queue the children to load their skeleton data and render this
-            // tile for now.
+            // One or more children are not even skeletons, so we can't compute their distance or SSE.
+            // So queue the children to load their skeleton data and render this tile for now.
             queueForSkeletonLoad(primitive, southwestChild);
             queueForSkeletonLoad(primitive, southeastChild);
             queueForSkeletonLoad(primitive, northwestChild);

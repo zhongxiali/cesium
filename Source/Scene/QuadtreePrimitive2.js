@@ -2,12 +2,16 @@
 define([
         '../Core/Math',
         '../Core/defined',
+        '../Core/defineProperties',
         '../Core/DeveloperError',
+        '../Core/getTimestamp',
         '../Scene/CullingVolume'
     ], function(
         CesiumMath,
         defined,
+        defineProperties,
         DeveloperError,
+        getTimestamp,
         CullingVolume
     ) {
     'use strict';
@@ -34,11 +38,73 @@ define([
         this._tileProvider = options.tileProvider;
 
         this._rootTiles = undefined;
-        this._traversalStack = [];
+        this._tilesToRender = [];
         this._skeletonLoadQueue = [];
         this._highPriorityLoadQueue = [];
         this._lowPriorityLoadQueue = [];
+        this._loadQueueTimeSlice = 5.0;
+
+        this._debug = {
+            enableDebugOutput : false,
+
+            maxDepth : 0,
+            tilesVisited : 0,
+            tilesCulled : 0,
+            tilesRendered : 0,
+            tilesWaitingForChildren : 0,
+
+            lastMaxDepth : -1,
+            lastTilesVisited : -1,
+            lastTilesCulled : -1,
+            lastTilesRendered : -1,
+            lastTilesWaitingForChildren : -1,
+
+            suspendLodUpdate : false
+        };
     }
+
+    defineProperties(QuadtreePrimitive.prototype, {
+        /**
+         * Gets the provider of {@link QuadtreeTile} instances for this quadtree.
+         * @type {QuadtreeTileProvider}
+         * @memberof QuadtreePrimitive.prototype
+         */
+        tileProvider : {
+            get : function() {
+                return this._tileProvider;
+            }
+        }
+    });
+
+    /**
+     * @private
+     */
+    QuadtreePrimitive.prototype.beginFrame = function(frameState) {
+        var passes = frameState.passes;
+        if (!passes.render) {
+            return;
+        }
+
+        // Gets commands for any texture re-projections and updates the credit display
+        this._tileProvider.initialize(frameState);
+
+        var debug = this._debug;
+        if (debug.suspendLodUpdate) {
+            return;
+        }
+
+        debug.maxDepth = 0;
+        debug.tilesVisited = 0;
+        debug.tilesCulled = 0;
+        debug.tilesRendered = 0;
+        debug.tilesWaitingForChildren = 0;
+
+        this._skeletonLoadQueue.length = 0;
+        this._highPriorityLoadQueue.length = 0;
+        this._lowPriorityLoadQueue.length = 0;
+
+        //this._tileReplacementQueue.markStartOfRenderFrame();
+    };
 
     /**
      * @private
@@ -68,6 +134,42 @@ define([
         }
     };
 
+    /**
+     * @private
+     */
+    QuadtreePrimitive.prototype.endFrame = function(frameState) {
+        var passes = frameState.passes;
+        if (!passes.render) {
+            return;
+        }
+
+        // Load/create resources for terrain and imagery.
+        processTileLoadQueues(this, frameState);
+        //updateHeights(this, frameState);
+
+        // var debug = this._debug;
+        // if (debug.suspendLodUpdate) {
+        //     return;
+        // }
+
+        // if (debug.enableDebugOutput) {
+        //     if (debug.tilesVisited !== debug.lastTilesVisited ||
+        //         debug.tilesRendered !== debug.lastTilesRendered ||
+        //         debug.tilesCulled !== debug.lastTilesCulled ||
+        //         debug.maxDepth !== debug.lastMaxDepth ||
+        //         debug.tilesWaitingForChildren !== debug.lastTilesWaitingForChildren) {
+
+        //         console.log('Visited ' + debug.tilesVisited + ', Rendered: ' + debug.tilesRendered + ', Culled: ' + debug.tilesCulled + ', Max Depth: ' + debug.maxDepth + ', Waiting for children: ' + debug.tilesWaitingForChildren);
+
+        //         debug.lastTilesVisited = debug.tilesVisited;
+        //         debug.lastTilesRendered = debug.tilesRendered;
+        //         debug.lastTilesCulled = debug.tilesCulled;
+        //         debug.lastMaxDepth = debug.maxDepth;
+        //         debug.lastTilesWaitingForChildren = debug.tilesWaitingForChildren;
+        //     }
+        // }
+    };
+
     function selectTilesForRendering(primitive, frameState) {
         var rootTiles = primitive._rootTiles;
         var cameraPosition = frameState.camera.positionCartographic;
@@ -77,7 +179,7 @@ define([
 
             queueForHighPriorityLoad(primitive, rootTile);
 
-            if (rootTile.isLoaded()) {
+            if (rootTile.isLoaded) {
                 selectTilesDepthFirst(primitive, frameState, rootTile, CullingVolume.MASK_INDETERMINATE, cameraPosition);
             }
         }
@@ -88,14 +190,15 @@ define([
         // is not guaranteed to be fully loaded.
 
         var tileProvider = primitive._tileProvider;
-        clippingPlaneMask = tileProvider.cullAgainstFrustum(tile, clippingPlaneMask);
+        clippingPlaneMask = tile.cullAgainstFrustum(tileProvider, clippingPlaneMask);
         if (clippingPlaneMask === CullingVolume.MASK_OUTSIDE) {
             // This tile is outside the view frustum.
             queueForLowPriorityLoad(primitive, tile);
             return;
         }
 
-        if (tile.isLeaf()) {
+        var isLeaf = !tileProvider.createTileChildrenIfNecessary(tile);
+        if (isLeaf) {
             // Don't refine past a leaf tile.
             queueForHighPriorityLoad(primitive, tile);
             addToRenderList(primitive, tile);
@@ -115,7 +218,7 @@ define([
         var northwestChild = tile.getNorthwestChild(tileProvider);
         var northeastChild = tile.getNortheastChild(tileProvider);
 
-        if (!southwestChild.isSkeleton() || !southeastChild.isSkeleton() || !northwestChild.isSkeleton() || !northeastChild.isSkeleton()) {
+        if (!southwestChild.isSkeletonReady || !southeastChild.isSkeletonReady || !northwestChild.isSkeletonReady || !northeastChild.isSkeletonReady) {
             // One or more children are not even skeletons, so we can't compute their distance or SSE.
             // So queue the children to load their skeleton data and render this tile for now.
             queueForSkeletonLoad(primitive, southwestChild);
@@ -129,10 +232,10 @@ define([
 
         // Children are all skeletons and this tile doesn't meet SSE, so refine.
         queueForLowPriorityLoad(primitive, tile);
-        recurseOnChildren(primitive, frameState, clippingPlaneMask, cameraPosition, southwestChild, southeastChild, northwestChild, northeastChild);
+        selectChildrenNearToFar(primitive, frameState, clippingPlaneMask, cameraPosition, southwestChild, southeastChild, northwestChild, northeastChild);
     }
 
-    function recurseOnChildren(primitive, frameState, clippingPlaneMask, cameraPosition, southwest, southeast, northwest, northeast) {
+    function selectChildrenNearToFar(primitive, frameState, clippingPlaneMask, cameraPosition, southwest, southeast, northwest, northeast) {
         if (cameraPosition.longitude < southwest.east) {
             if (cameraPosition.latitude < southwest.north) {
                 // Camera in southwest quadrant
@@ -165,19 +268,19 @@ define([
     }
 
     function queueForSkeletonLoad(primitive, tile) {
-        if (tile && !tile.isSkeleton()) {
+        if (tile && !tile.isSkeletonReady) {
             primitive._skeletonLoadQueue.push(tile);
         }
     }
 
     function queueForLowPriorityLoad(primitive, tile) {
-        if (tile && !tile.isLoaded()) {
+        if (tile && !tile.isLoaded) {
             primitive._lowPriorityLoadQueue.push(tile);
         }
     }
 
     function queueForHighPriorityLoad(primitive, tile) {
-        if (tile && !tile.isLoaded()) {
+        if (tile && !tile.isLoaded) {
             primitive._highPriorityLoadQueue.push(tile);
         }
     }
@@ -216,6 +319,51 @@ define([
             //     tilesToUpdateHeights.push(tile);
             // }
             tile._frameRendered = frameState.frameNumber;
+        }
+    }
+
+    function processTileLoadQueues(primitive, frameState) {
+        var skeletonLoadQueue = primitive._skeletonLoadQueue;
+        var highPriorityLoadQueue = primitive._highPriorityLoadQueue;
+        var lowPriorityLoadQueue = primitive._highPriorityLoadQueue;
+
+        if (skeletonLoadQueue.length === 0 && highPriorityLoadQueue.length === 0 && lowPriorityLoadQueue === 0) {
+            return;
+        }
+
+        // Remove any tiles that were not used this frame beyond the number
+        // we're allowed to keep.
+        // primitive._tileReplacementQueue.trimTiles(primitive.tileCacheSize);
+
+        var startTime = getTimestamp();
+        var timeSlice = primitive._loadQueueTimeSlice;
+        var endTime = startTime + timeSlice;
+
+        var tileProvider = primitive._tileProvider;
+
+        // Loading skeletons is our highest priority.
+        for (var i = skeletonLoadQueue.length - 1; i >= 0; --i) {
+            var tile = skeletonLoadQueue[i];
+            tile.loadSkeleton(tileProvider, frameState);
+            if (getTimestamp() >= endTime) {
+                break;
+            }
+        }
+
+        // Load high and low priority geometry.
+        processTileLoadQueue(primitive, frameState, highPriorityLoadQueue, endTime);
+        processTileLoadQueue(primitive, frameState, lowPriorityLoadQueue, endTime);
+    }
+
+    function processTileLoadQueue(primitive, frameState, tileLoadQueue, endTime) {
+        var tileProvider = primitive._tileProvider;
+
+        for (var i = tileLoadQueue.length - 1; i >= 0; --i) {
+            var tile = tileLoadQueue[i];
+            tile.loadGeometry(tileProvider, frameState);
+            if (getTimestamp() >= endTime) {
+                break;
+            }
         }
     }
 

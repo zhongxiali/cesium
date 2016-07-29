@@ -139,7 +139,7 @@ define([
     defineProperties(QuadtreePrimitive.prototype, {
         /**
          * Gets the provider of {@link QuadtreeTile} instances for this quadtree.
-         * @type {QuadtreeTile}
+         * @type {QuadtreeTileProvider}
          * @memberof QuadtreePrimitive.prototype
          */
         tileProvider : {

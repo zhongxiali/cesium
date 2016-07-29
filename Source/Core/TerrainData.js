@@ -31,6 +31,22 @@ define([
          */
         waterMask : {
             get : DeveloperError.throwInstantiationError
+        },
+
+        /**
+         * Gets a bitmask indicating which of this tile's four children exist.  The bit values are as follows:
+         * <table>
+         *   <tr><th>Bit Position</th><th>Bit Value</th><th>Child Tile</th></tr>
+         *   <tr><td>0</td><td>1</td><td>Southwest</td></tr>
+         *   <tr><td>1</td><td>2</td><td>Southeast</td></tr>
+         *   <tr><td>2</td><td>4</td><td>Northwest</td></tr>
+         *   <tr><td>3</td><td>8</td><td>Northeast</td></tr>
+         * </table>
+         * @memberOf TerrainData.prototype
+         * @type {Object}
+         */
+        childTileMask : {
+            get : DeveloperError.throwInstantiationError
         }
     });
 

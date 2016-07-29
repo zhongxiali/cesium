@@ -25,8 +25,10 @@ define([
         '../ThirdParty/when',
         './GlobeSurfaceShaderSet',
         './GlobeSurfaceTileProvider',
+        './GlobeSurfaceTileProvider2',
         './ImageryLayerCollection',
         './QuadtreePrimitive',
+        './QuadtreePrimitive2',
         './SceneMode'
     ], function(
         BoundingSphere,
@@ -54,8 +56,10 @@ define([
         when,
         GlobeSurfaceShaderSet,
         GlobeSurfaceTileProvider,
+        GlobeSurfaceTileProvider2,
         ImageryLayerCollection,
         QuadtreePrimitive,
+        QuadtreePrimitive2,
         SceneMode) {
     'use strict';
 
@@ -89,8 +93,16 @@ define([
             sources : [GlobeFS]
         });
 
-        this._surface = new QuadtreePrimitive({
-            tileProvider : new GlobeSurfaceTileProvider({
+        // this._surface = new QuadtreePrimitive({
+        //     tileProvider : new GlobeSurfaceTileProvider({
+        //         terrainProvider : terrainProvider,
+        //         imageryLayers : imageryLayerCollection,
+        //         surfaceShaderSet : this._surfaceShaderSet
+        //     })
+        // });
+
+        this._surface = new QuadtreePrimitive2({
+            tileProvider : new GlobeSurfaceTileProvider2({
                 terrainProvider : terrainProvider,
                 imageryLayers : imageryLayerCollection,
                 surfaceShaderSet : this._surfaceShaderSet

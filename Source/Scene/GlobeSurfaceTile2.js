@@ -1,8 +1,14 @@
 /*global define*/
 define([
-        '../Core/DeveloperError'
+        '../Core/defined',
+        '../Core/defineProperties',
+        '../Core/DeveloperError',
+        './TileTerrain2'
     ], function(
-        DeveloperError
+        defined,
+        defineProperties,
+        DeveloperError,
+        TileTerrain
     ) {
     'use strict';
 
@@ -77,28 +83,46 @@ define([
         this.imageryTiles = [];
     }
 
-    GlobeSurfaceTile.prototype.isLoaded = function(tileProvider) {
-        return defined(this.readyGeometry);
+    defineProperties(GlobeSurfaceTile.prototype, {
+        isSkeletonReady : {
+            get : function() {
+                return defined(this.region);
+            }
+        },
+
+        isLoaded : {
+            get : function() {
+                return defined(this.readyGeometry) && !defined(this.loadingGeometry);
+            }
+        }
+    });
+
+    GlobeSurfaceTile.prototype.cullAgainstFrustum = function(tileProvider, clippingPlaneMask) {
     };
 
-    GlobeSurfaceTile.prototype.isSkeleton = function(tileProvider) {
-        return defined(this.region);
+    GlobeSurfaceTile.prototype.loadGeometry = function(tileProvider, frameState) {
+        loadTerrain(this, tileProvider, frameState);
+        loadImagery(this, tileProvider, frameState);
     };
 
-    GlobeSurfaceTile.prototype.isLeaf = function(tileProvider) {
+    GlobeSurfaceTile.prototype.loadSkeleton = function(tileProvider, frameState) {
     };
 
-    GlobeSurfaceTile.prototype.getSouthwestChild = function(tileProvider) {
-    };
+    function loadTerrain(tile, tileProvider, frameState) {
+        if (!tile.loadingGeometry) {
+            if (tile.readyGeometry && !tile.readyGeometry.geographicTextureCoordinateSubset) {
+                // Terrain is already loaded.
+                return;
+            }
 
-    GlobeSurfaceTile.prototype.getSoutheastChild = function(tileProvider) {
-    };
+            tile.loadingGeometry = new TileTerrain();
+        }
 
-    GlobeSurfaceTile.prototype.getNorthwestChild = function(tileProvider) {
-    };
+        tile.loadingGeometry.load(tile, tileProvider, frameState);
+    }
 
-    GlobeSurfaceTile.prototype.getNortheastChild = function(tileProvider) {
-    };
+    function loadImagery(tile, tileProvider, frameState) {
+    }
 
     return GlobeSurfaceTile;
 });

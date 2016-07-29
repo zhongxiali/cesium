@@ -104,7 +104,7 @@ define([
      *     eastSkirtHeight : 1.0,
      *     northSkirtHeight : 1.0
      * });
-     * 
+     *
      * @see TerrainData
      * @see HeightmapTerrainData
      */
@@ -209,6 +209,24 @@ define([
         waterMask : {
             get : function() {
                 return this._waterMask;
+            }
+        },
+
+        /**
+         * Gets a bitmask indicating which of this tile's four children exist.  The bit values are as follows:
+         * <table>
+         *   <tr><th>Bit Position</th><th>Bit Value</th><th>Child Tile</th></tr>
+         *   <tr><td>0</td><td>1</td><td>Southwest</td></tr>
+         *   <tr><td>1</td><td>2</td><td>Southeast</td></tr>
+         *   <tr><td>2</td><td>4</td><td>Northwest</td></tr>
+         *   <tr><td>3</td><td>8</td><td>Northeast</td></tr>
+         * </table>
+         * @memberOf QuantizedMeshTerrainData.prototype
+         * @type {Object}
+         */
+        childTileMask : {
+            get : function() {
+                return this._childTileMask;
             }
         }
     });

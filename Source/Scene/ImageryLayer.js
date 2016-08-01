@@ -40,7 +40,7 @@ define([
         '../ThirdParty/when',
         './Imagery',
         './ImageryState',
-        './TileImagery'
+        './ImageryTileOnTerrain'
     ], function(
         BoundingRectangle,
         Cartesian2,
@@ -82,7 +82,7 @@ define([
         when,
         Imagery,
         ImageryState,
-        TileImagery) {
+        ImageryTileOnTerrain) {
     'use strict';
 
     /**
@@ -223,7 +223,7 @@ define([
 
         this._imageryCache = {};
 
-        this._skeletonPlaceholder = new TileImagery(Imagery.createPlaceholder(this));
+        this._skeletonPlaceholder = new ImageryTileOnTerrain(Imagery.createPlaceholder(this));
 
         // The value of the show property on the last update.
         this._show = true;
@@ -391,7 +391,7 @@ define([
      * @returns {Boolean} true if this layer overlaps any portion of the terrain tile; otherwise, false.
      */
     ImageryLayer.prototype._createTileImagerySkeletons = function(tile, terrainProvider, insertionPoint) {
-        var surfaceTile = tile.data;
+        var surfaceTile = tile;
 
         if (defined(this._minimumTerrainLevel) && tile.level < this._minimumTerrainLevel) {
             return false;
@@ -410,7 +410,7 @@ define([
             // The imagery provider is not ready, so we can't create skeletons, yet.
             // Instead, add a placeholder so that we'll know to create
             // the skeletons once the provider is ready.
-            this._skeletonPlaceholder.loadingImagery.addReference();
+            this._skeletonPlaceholder.loading.addReference();
             surfaceTile.imagery.splice(insertionPoint, 0, this._skeletonPlaceholder);
             return true;
         }
@@ -571,7 +571,7 @@ define([
 
                 var texCoordsRectangle = new Cartesian4(minU, minV, maxU, maxV);
                 var imagery = this.getImageryFromCache(i, j, imageryLevel, imageryRectangle);
-                surfaceTile.imagery.splice(insertionPoint, 0, new TileImagery(imagery, texCoordsRectangle));
+                surfaceTile.imagery.splice(insertionPoint, 0, new ImageryTileOnTerrain(imagery, texCoordsRectangle));
                 ++insertionPoint;
             }
         }
@@ -580,19 +580,17 @@ define([
     };
 
     /**
-     * Calculate the translation and scale for a particular {@link TileImagery} attached to a
+     * Calculate the translation and scale for a particular imagery tile attached to a
      * particular terrain tile.
      *
      * @private
      *
-     * @param {Tile} tile The terrain tile.
-     * @param {TileImagery} tileImagery The imagery tile mapping.
+     * @param {Rectangle} terrainRectangle The rectangle of the terrain tile.
+     * @param {Rectangle} imageryRectangle The rectangle of the imagery tile.
      * @returns {Cartesian4} The translation and scale where X and Y are the translation and Z and W
      *          are the scale.
      */
-    ImageryLayer.prototype._calculateTextureTranslationAndScale = function(tile, tileImagery) {
-        var imageryRectangle = tileImagery.readyImagery.rectangle;
-        var terrainRectangle = tile.rectangle;
+    ImageryLayer.prototype._calculateTextureTranslationAndScale = function(terrainRectangle, imageryRectangle) {
         var terrainWidth = terrainRectangle.width;
         var terrainHeight = terrainRectangle.height;
 

@@ -110,6 +110,8 @@ define([
      * @private
      */
     QuadtreePrimitive.prototype.update = function(frameState) {
+        this._tilesToRender.length = 0;
+
         if (!this._tileProvider.ready) {
             return;
         }
@@ -179,7 +181,7 @@ define([
 
             queueForHighPriorityLoad(primitive, rootTile);
 
-            if (rootTile.isLoaded) {
+            if (!rootTile.needsLoad) {
                 selectTilesDepthFirst(primitive, frameState, rootTile, CullingVolume.MASK_INDETERMINATE, cameraPosition);
             }
         }
@@ -213,14 +215,14 @@ define([
             return;
         }
 
-        var southwestChild = tile.getSouthwestChild(tileProvider);
-        var southeastChild = tile.getSoutheastChild(tileProvider);
-        var northwestChild = tile.getNorthwestChild(tileProvider);
-        var northeastChild = tile.getNortheastChild(tileProvider);
+        var southwestChild = tile.southwestChild;
+        var southeastChild = tile.southeastChild;
+        var northwestChild = tile.northwestChild;
+        var northeastChild = tile.northeastChild;
 
-        if (!southwestChild.isSkeletonReady || !southeastChild.isSkeletonReady || !northwestChild.isSkeletonReady || !northeastChild.isSkeletonReady) {
-            // One or more children are not even skeletons, so we can't compute their distance or SSE.
-            // So queue the children to load their skeleton data and render this tile for now.
+        if (!southwestChild.isSelectable || !southeastChild.isSelectable || !northwestChild.isSelectable || !northeastChild.isSelectable) {
+            // One or more children are not selectable, so we can't compute their distance or SSE.
+            // Queue the children to load their skeleton data and render this tile for now.
             queueForSkeletonLoad(primitive, southwestChild);
             queueForSkeletonLoad(primitive, southeastChild);
             queueForSkeletonLoad(primitive, northwestChild);
@@ -268,19 +270,19 @@ define([
     }
 
     function queueForSkeletonLoad(primitive, tile) {
-        if (tile && !tile.isSkeletonReady) {
+        if (tile && !tile.isSelectable) {
             primitive._skeletonLoadQueue.push(tile);
         }
     }
 
     function queueForLowPriorityLoad(primitive, tile) {
-        if (tile && !tile.isLoaded) {
+        if (tile && tile.needsLoad) {
             primitive._lowPriorityLoadQueue.push(tile);
         }
     }
 
     function queueForHighPriorityLoad(primitive, tile) {
-        if (tile && !tile.isLoaded) {
+        if (tile && tile.needsLoad) {
             primitive._highPriorityLoadQueue.push(tile);
         }
     }
@@ -295,7 +297,7 @@ define([
         }
 
         // Avoid divide by zero when viewer is inside the tile
-        var distance = Math.max(tileProvider.computeDistanceToTile(tile, frameState), CesiumMath.EPSILON7);
+        var distance = Math.max(tile.computeDistanceFromViewer(frameState), CesiumMath.EPSILON7);
         var height = frameState.context.drawingBufferHeight;
         var sseDenominator = frameState.camera.frustum.sseDenominator;
 
@@ -344,7 +346,7 @@ define([
         // Loading skeletons is our highest priority.
         for (var i = skeletonLoadQueue.length - 1; i >= 0; --i) {
             var tile = skeletonLoadQueue[i];
-            tile.loadSkeleton(tileProvider, frameState);
+            tile.loadSelectionData(tileProvider, frameState);
             if (getTimestamp() >= endTime) {
                 break;
             }
@@ -360,7 +362,7 @@ define([
 
         for (var i = tileLoadQueue.length - 1; i >= 0; --i) {
             var tile = tileLoadQueue[i];
-            tile.loadGeometry(tileProvider, frameState);
+            tile.loadRenderData(tileProvider, frameState);
             if (getTimestamp() >= endTime) {
                 break;
             }

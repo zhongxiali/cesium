@@ -389,7 +389,7 @@ define([
         }
 
         var aaBox = new AxisAlignedBoundingBox(minimum, maximum, relativeToCenter);
-        var encoding = new TerrainEncoding(aaBox, hMin, maximumHeight, fromENU, false, includeWebMercatorY);
+        var encoding = new TerrainEncoding(aaBox, hMin, maximumHeight, fromENU, false, true, includeWebMercatorY);
         var vertices = new Float32Array(size * encoding.getStride());
 
         var bufferIndex = 0;

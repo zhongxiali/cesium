@@ -75,9 +75,9 @@ define([
      * @param {Cartesian3} vector The normalized vector to be compressed into 2 byte 'oct' encoding.
      * @param {Cartesian2} result The 2 byte oct-encoded unit length vector.
      * @returns {Cartesian2} The 2 byte oct-encoded unit length vector.
-     * 
+     *
      * @exception {DeveloperError} vector must be normalized.
-     * 
+     *
      * @see AttributeCompression.octEncodeInRange
      * @see AttributeCompression.octDecode
      */
@@ -124,14 +124,14 @@ define([
 
     /**
      * Decodes a unit-length vector in 2 byte 'oct' encoding to a normalized 3-component vector.
-     * 
+     *
      * @param {Number} x The x component of the oct-encoded unit length vector.
      * @param {Number} y The y component of the oct-encoded unit length vector.
      * @param {Cartesian3} result The decoded and normalized vector.
      * @returns {Cartesian3} The decoded and normalized vector.
-     * 
+     *
      * @exception {DeveloperError} x and y must be an unsigned normalized integer between 0 and 255.
-     * 
+     *
      * @see AttributeCompression.octDecodeInRange
      */
     AttributeCompression.octDecode = function(x, y, result) {

@@ -1,7 +1,8 @@
 /*global define*/
 define([
+        './freezeObject'
     ], function(
-    ) {
+        freezeObject) {
     'use strict';
 
     var CompressedAttributeType = {

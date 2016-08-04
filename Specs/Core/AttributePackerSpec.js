@@ -125,6 +125,29 @@ defineSuite([
             }]);
         });
 
+        it('works with five total floats', function() {
+            packer.addAttribute('foo', 3, CompressedAttributeType.FLOAT);
+            packer.addAttribute('bar', 2, CompressedAttributeType.FLOAT);
+            expect(packer.getWebGLAttributeList(fakeBuffer)).toEqual([
+                {
+                    index: 0,
+                    vertexBuffer: fakeBuffer,
+                    componentDatatype: ComponentDatatype.FLOAT,
+                    componentsPerAttribute: 4,
+                    offsetInBytes: 0,
+                    strideInBytes: 20
+                },
+                {
+                    index: 1,
+                    vertexBuffer: fakeBuffer,
+                    componentDatatype: ComponentDatatype.FLOAT,
+                    componentsPerAttribute: 1,
+                    offsetInBytes: 16,
+                    strideInBytes: 20
+                }
+            ]);
+        });
+
         it('works with a single 12 bit', function() {
             packer.addAttribute('foo', 1, CompressedAttributeType.TWELVE_BITS);
             expect(packer.getWebGLAttributeList(fakeBuffer)).toEqual([{
@@ -290,6 +313,85 @@ defineSuite([
             });
             expect(fakeBuffer[0]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(1.23, 4.56)));
             expect(fakeBuffer[1]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(7.89, 10.11)));
+        });
+
+        it('works with two 12 bit Cartesian3s', function() {
+            packer.addAttribute('foo', 3, CompressedAttributeType.TWELVE_BITS);
+            packer.addAttribute('bar', 3, CompressedAttributeType.TWELVE_BITS);
+            packer.putVertex(fakeBuffer, 0, {
+                foo: new Cartesian3(1.23, 4.56, 7.89),
+                bar: new Cartesian3(10.11, 12.13, 14.15)
+            });
+            expect(fakeBuffer[0]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(1.23, 4.56)));
+            expect(fakeBuffer[1]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(7.89, 10.11)));
+            expect(fakeBuffer[2]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(12.13, 14.15)));
+        });
+    });
+
+    describe('everything', function() {
+        it('works with a typical terrain vertex structure', function() {
+            packer.addAttribute('position', 3, CompressedAttributeType.TWELVE_BITS);
+            packer.addAttribute('textureCoordinates', 2, CompressedAttributeType.TWELVE_BITS);
+            packer.addAttribute('height', 1, CompressedAttributeType.TWELVE_BITS);
+            packer.addAttribute('webMercatorY', 1, CompressedAttributeType.TWELVE_BITS);
+            packer.addAttribute('normal', 1, CompressedAttributeType.FLOAT);
+
+            expect(packer.getWebGLAttributeList(fakeBuffer)).toEqual([
+                {
+                    index: 0,
+                    vertexBuffer: fakeBuffer,
+                    componentDatatype: ComponentDatatype.FLOAT,
+                    componentsPerAttribute: 4,
+                    offsetInBytes: 0,
+                    strideInBytes: 20
+                },
+                {
+                    index: 1,
+                    vertexBuffer: fakeBuffer,
+                    componentDatatype: ComponentDatatype.FLOAT,
+                    componentsPerAttribute: 1,
+                    offsetInBytes: 16,
+                    strideInBytes: 20
+                }
+            ]);
+
+            expect(packer.getGlslUnpackingCode('packed')).toBe(
+                'vec2 twelveBit0x = czm_decompressTextureCoordinates(packed0.x);\n' +
+                'vec2 twelveBit0y = czm_decompressTextureCoordinates(packed0.y);\n' +
+                'vec3 position = vec3(twelveBit0x, twelveBit0y.x);\n' +
+                'vec2 twelveBit0z = czm_decompressTextureCoordinates(packed0.z);\n' +
+                'vec2 textureCoordinates = vec2(twelveBit0y.y, twelveBit0z.x);\n' +
+                'float height = twelveBit0z.y;\n' +
+                'vec2 twelveBit0w = czm_decompressTextureCoordinates(packed0.w);\n' +
+                'float webMercatorY = twelveBit0w.x;\n' +
+                'float normal = packed1;');
+
+            packer.putVertex(fakeBuffer, 0, {
+                position: new Cartesian3(0.12, 0.34, 0.45),
+                textureCoordinates: new Cartesian2(0.67, 0.89),
+                height: 0.910,
+                webMercatorY: 0.1112,
+                normal: AttributeCompression.octPackFloat(new Cartesian2(0.1314, 0.1516))
+            });
+
+            packer.putVertex(fakeBuffer, 1, {
+                position: new Cartesian3(0.89, 0.76, 0.54),
+                textureCoordinates: new Cartesian2(0.32, 0.10),
+                height: 0.123,
+                webMercatorY: 0.456,
+                normal: AttributeCompression.octPackFloat(new Cartesian2(0.789, 0.1011))
+            });
+
+            var vertex = {
+                position: new Cartesian3(),
+                textureCoordinates: new Cartesian2(),
+                height: 0.0,
+                webMercatorY: 0.0,
+                normal: 0.0
+            };
+
+            packer.getVertex(fakeBuffer, 0, vertex);
+            expect(vertex.position).toEqualEpsilon(new Cartesian3(0.12, 0.34, 0.45), 1/4096);
         });
     });
 });

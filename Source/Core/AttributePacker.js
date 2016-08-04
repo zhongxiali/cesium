@@ -53,7 +53,7 @@ define([
 
         for (var i = 0; i < numberOfElements; ++i) {
             var child = {
-                name: name + '_' + elementNames[i],
+                name: name,
                 numberOfElements: 1,
                 compressedAttributeType: compressedAttributeType,
 
@@ -77,23 +77,19 @@ define([
 
         var sizeOfFloat = ComponentDatatype.getSizeInBytes(ComponentDatatype.FLOAT);
 
-        var get = this._get;
-        for (var i = 0; i < get.length; i += 4) {
+        for (var i = 0; i < this._numberOfFloats; i += 4) {
             result.push({
                 index: i,
                 vertexBuffer: buffer,
                 componentDatatype: ComponentDatatype.FLOAT,
-                componentsPerAttribute: Math.min(get.length - i, 4),
+                componentsPerAttribute: Math.min(this._numberOfFloats - i, 4),
                 offsetInBytes: i * sizeOfFloat,
-                strideInBytes: get.length * sizeOfFloat
+                strideInBytes: this._numberOfFloats * sizeOfFloat
             });
         }
 
         return result;
     };
-
-    var elementNames = ['x', 'y', 'z', 'w'];
-    var elementSizeNames = ['', 'float', 'vec2', 'vec3', 'vec4'];
 
     AttributePacker.prototype.getGlslUnpackingCode = function(compressedAttributeBaseName) {
         computeStorage(this);
@@ -157,36 +153,12 @@ define([
         return lines.join('\n');
     };
 
-    function getSubAttributeSourceVariableName(compressedAttributeBaseName, attribute) {
-        if (attribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS) {
-            return 'twelveBit' + attribute.attributeIndex + elementNames[attribute.elementIndex];
-        } else {
-            return compressedAttributeBaseName + attribute.attributeIndex;
-        }
-    }
-
-    function getSubAttributeSourceVariableWidth(packer, attribute) {
-        if (attribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS) {
-            return 2;
-        } else {
-            return attribute.attributeIndex === packer._numberOfVertexAttributes - 1 ? (packer._numberOfFloats % 4 || 4) : 4;
-        }
-    }
-
-    function getSubAttributeSourceVariableElement(attribute) {
-        if (attribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS) {
-            return attribute.isFirstHalf ? 'x' : 'y';
-        } else {
-            return elementNames[attribute.elementIndex];
-        }
-    }
-
     AttributePacker.prototype.putVertex = function(buffer, index, values) {
         computeStorage(this);
 
         var put = this._put;
         for (var i = 0; i < put.length; ++i) {
-            put(buffer, index, values);
+            put[i](buffer, index, values);
         }
     };
 
@@ -197,7 +169,7 @@ define([
 
         var get = this._get;
         for (var i = 0; i < get.length; ++i) {
-            get(buffer, index, result);
+            get[i](buffer, index, result);
         }
     };
 
@@ -212,6 +184,24 @@ define([
         var twelveBits = packer._flatAttributes.filter(function(attribute) {
             return attribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS;
         });
+
+        var putArguments = ['AttributeCompression', 'cartesian2Scratch', 'buffer', 'index', 'vertex'];
+        var put = '';
+        var offset = 0;
+
+        for (var i = 0; i < twelveBits.length; i += 2) {
+            twelveBits[i].attributeIndex = twelveBits[i + 1].attributeIndex = (offset / 4) | 0;
+            twelveBits[i].elementIndex = twelveBits[i + 1].elementIndex = offset % 4;
+            twelveBits[i].isFirstHalf = true;
+            twelveBits[i + 1].isFirstHalf = false;
+
+            put += 'cartesian2Scratch.x = vertex.' + twelveBits[i].name + (twelveBits[i].parentAttribute.subAttributes.length == 1 ? '' : '.' + elementNames[twelveBits[i].elementIndex]) + ';\n';
+            put += 'cartesian2Scratch.y = vertex.' + twelveBits[i + 1].name + (twelveBits[i + 1].parentAttribute.subAttributes.length == 1 ? '' : '.' + elementNames[twelveBits[i + 1].elementIndex]) + ';\n';
+            put += 'var twelveBits' + offset + ' = AttributeCompression.compressTextureCoordinates(' + ');\n';
+            put += 'buffer[index + ' + offset + '] = twelveBits' + offset + ';\n';
+        }
+
+        console.log(put);
 
         var floats = packer._flatAttributes.filter(function(attribute) {
             return attribute.compressedAttributeType === CompressedAttributeType.FLOAT;
@@ -271,6 +261,33 @@ define([
 
     function getFloat(offset, name, buffer, index, result) {
         result[name] = buffer[index + offset];
+    }
+
+    var elementNames = ['x', 'y', 'z', 'w'];
+    var elementSizeNames = ['', 'float', 'vec2', 'vec3', 'vec4'];
+
+    function getSubAttributeSourceVariableName(compressedAttributeBaseName, attribute) {
+        if (attribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS) {
+            return 'twelveBit' + attribute.attributeIndex + elementNames[attribute.elementIndex];
+        } else {
+            return compressedAttributeBaseName + attribute.attributeIndex;
+        }
+    }
+
+    function getSubAttributeSourceVariableWidth(packer, attribute) {
+        if (attribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS) {
+            return 2;
+        } else {
+            return attribute.attributeIndex === packer._numberOfVertexAttributes - 1 ? (packer._numberOfFloats % 4 || 4) : 4;
+        }
+    }
+
+    function getSubAttributeSourceVariableElement(attribute) {
+        if (attribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS) {
+            return attribute.isFirstHalf ? 'x' : 'y';
+        } else {
+            return elementNames[attribute.elementIndex];
+        }
     }
 
     return AttributePacker;

@@ -57,6 +57,7 @@ define([
                 numberOfElements: 1,
                 compressedAttributeType: compressedAttributeType,
 
+                subAttrNumber: i,
                 attributeIndex: -1,
                 elementIndex: -1,
                 isFirstHalf: undefined,
@@ -153,13 +154,9 @@ define([
         return lines.join('\n');
     };
 
-    AttributePacker.prototype.putVertex = function(buffer, index, values) {
+    AttributePacker.prototype.putVertex = function(buffer, index, vertex) {
         computeStorage(this);
-
-        var put = this._put;
-        for (var i = 0; i < put.length; ++i) {
-            put[i](buffer, index, values);
-        }
+        this._put(AttributeCompression, cartesian2Scratch, buffer, index, vertex);
     };
 
     AttributePacker.prototype.getVertex = function(buffer, index, result) {
@@ -178,9 +175,6 @@ define([
             return;
         }
 
-        var get = packer._get = [];
-        var put = packer._put = [];
-
         var twelveBits = packer._flatAttributes.filter(function(attribute) {
             return attribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS;
         });
@@ -189,25 +183,47 @@ define([
         var put = '';
         var offset = 0;
 
-        for (var i = 0; i < twelveBits.length; i += 2) {
-            twelveBits[i].attributeIndex = twelveBits[i + 1].attributeIndex = (offset / 4) | 0;
-            twelveBits[i].elementIndex = twelveBits[i + 1].elementIndex = offset % 4;
+        var i;
+        for (i = 0; i < twelveBits.length; i += 2) {
+            twelveBits[i].attributeIndex = (offset / 4) | 0;
+            twelveBits[i].elementIndex = offset % 4;
             twelveBits[i].isFirstHalf = true;
-            twelveBits[i + 1].isFirstHalf = false;
 
-            put += 'cartesian2Scratch.x = vertex.' + twelveBits[i].name + (twelveBits[i].parentAttribute.subAttributes.length == 1 ? '' : '.' + elementNames[twelveBits[i].elementIndex]) + ';\n';
-            put += 'cartesian2Scratch.y = vertex.' + twelveBits[i + 1].name + (twelveBits[i + 1].parentAttribute.subAttributes.length == 1 ? '' : '.' + elementNames[twelveBits[i + 1].elementIndex]) + ';\n';
-            put += 'var twelveBits' + offset + ' = AttributeCompression.compressTextureCoordinates(' + ');\n';
-            put += 'buffer[index + ' + offset + '] = twelveBits' + offset + ';\n';
+            var second = i + 1;
+            if (second < twelveBits.length) {
+                twelveBits[second].attributeIndex = twelveBits[i].attributeIndex;
+                twelveBits[second].elementIndex = twelveBits[i].elementIndex;
+                twelveBits[second].isFirstHalf = false;
+                put += 'cartesian2Scratch.y = vertex.' + twelveBits[second].name +
+                       (twelveBits[second].parentAttribute.subAttributes.length === 1 ? '' : '.' + elementNames[twelveBits[second].subAttrNumber]) + ';\n';
+            } else {
+                put += 'cartesian2Scratch.y = 0.0;\n';
+            }
+
+            put += 'cartesian2Scratch.x = vertex.' + twelveBits[i].name + (twelveBits[i].parentAttribute.subAttributes.length === 1 ? '' : '.' + elementNames[twelveBits[i].subAttrNumber]) + ';\n';
+            put += 'buffer[index + ' + offset + '] = AttributeCompression.compressTextureCoordinates(cartesian2Scratch);\n';
+
+            ++offset;
         }
-
-        console.log(put);
 
         var floats = packer._flatAttributes.filter(function(attribute) {
             return attribute.compressedAttributeType === CompressedAttributeType.FLOAT;
         });
 
-        var offset = 0;
+        for (i = 0; i < floats.length; ++i) {
+            floats[i].attributeIndex = (offset / 4) | 0;
+            floats[i].elementIndex = offset % 4;
+
+            put += 'buffer[index + ' + offset + '] = vertex.' + floats[i].name + 
+                   (floats[i].parentAttribute.subAttributes.length === 1 ? '' : '.' + elementNames[floats[i].subAttrNumber]) + ';\n';
+
+            ++offset;
+        }
+
+        // Yes, this is a form of eval.  It's also much faster than the alternatives.
+        packer._put = new Function(putArguments, put); // jshint ignore:line
+
+        /*var offset = 0;
 
         var pairs = (twelveBits.length >> 1) << 1;
         for (var i = 0; i < pairs; i += 2) {
@@ -235,33 +251,13 @@ define([
             floats[j].attributeIndex = (offset / 4) | 0;
             floats[j].elementIndex = offset % 4;
             ++offset;
-        }
+        }*/
 
         packer._numberOfFloats = offset;
         packer._numberOfVertexAttributes = Math.ceil(packer._numberOfFloats / 4.0);
     }
 
     var cartesian2Scratch = new Cartesian2();
-
-    function putTwelveBitPair(offset, firstName, secondName, buffer, index, values) {
-        cartesian2Scratch.x = values[firstName];
-        cartesian2Scratch.y = values[secondName];
-        buffer[index + offset] = AttributeCompression.compressTextureCoordinates(cartesian2Scratch);
-    }
-
-    function getTwelveBitPair(offset, firstName, secondName, buffer, index, result) {
-        AttributeCompression.decompressTextureCoordinates(buffer[index + offset], cartesian2Scratch);
-        result[firstName] = cartesian2Scratch.x;
-        result[secondName] = cartesian2Scratch.y;
-    }
-
-    function putFloat(offset, name, buffer, index, values) {
-        buffer[index + offset] = values[name];
-    }
-
-    function getFloat(offset, name, buffer, index, result) {
-        result[name] = buffer[index + offset];
-    }
 
     var elementNames = ['x', 'y', 'z', 'w'];
     var elementSizeNames = ['', 'float', 'vec2', 'vec3', 'vec4'];

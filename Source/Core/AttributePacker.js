@@ -156,14 +156,14 @@ define([
 
     AttributePacker.prototype.putVertex = function(buffer, index, vertex) {
         computeStorage(this);
-        this._put(AttributeCompression, cartesian2Scratch, buffer, index, vertex);
+        this._put(AttributeCompression, cartesian2Scratch, buffer, index * this._numberOfFloats, vertex);
     };
 
     AttributePacker.prototype.getVertex = function(buffer, index, result) {
         computeStorage(this);
 
         result = result || {};
-        return this._get(AttributeCompression, cartesian2Scratch, buffer, index, result);
+        return this._get(AttributeCompression, cartesian2Scratch, buffer, index * this._numberOfFloats, result);
     };
 
     function computeStorage(packer) {

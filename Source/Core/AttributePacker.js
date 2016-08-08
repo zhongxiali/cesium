@@ -92,6 +92,24 @@ define([
         return result;
     };
 
+    AttributePacker.prototype.getWebGLAttributeLocations = function(compressedAttributeBaseName) {
+        var result = {};
+        for (var i = 0; i < this._numberOfVertexAttributes; ++i) {
+            result[compressedAttributeBaseName + i] = i;
+        }
+        return result;
+    };
+
+    AttributePacker.prototype.getGlslAttributeDeclarations = function(compressedAttributeBaseName) {
+        var result = '';
+        for (var i = 0; i < this._numberOfFloats; i += 4) {
+            var elementCount = Math.min(this._numberOfFloats - i, 4);
+            result += variableSizeNames[elementCount] + ' ' +
+                      compressedAttributeBaseName + (i / 4 | 0) + ';\n';
+        }
+        return result;
+    };
+
     AttributePacker.prototype.getGlslUnpackingCode = function(compressedAttributeBaseName) {
         computeStorage(this);
 
@@ -145,10 +163,10 @@ define([
             if (rhsParts.length === 1) {
                 rhs = rhsParts[0];
             } else {
-                rhs = elementSizeNames[attribute.numberOfElements] + '(' + rhsParts.join(', ') + ')';
+                rhs = variableSizeNames[attribute.numberOfElements] + '(' + rhsParts.join(', ') + ')';
             }
 
-            lines.push(elementSizeNames[attribute.numberOfElements] + ' ' + attribute.name + ' = ' + rhs + ';');
+            lines.push(variableSizeNames[attribute.numberOfElements] + ' ' + attribute.name + ' = ' + rhs + ';');
         });
 
         return lines.join('\n');
@@ -164,6 +182,9 @@ define([
 
         result = result || {};
         return this._get(AttributeCompression, cartesian2Scratch, buffer, index * this._numberOfFloats, result);
+    };
+
+    AttributePacker.prototype.createSingleAttributeGetFunction = function(attributeName) {
     };
 
     function computeStorage(packer) {
@@ -240,7 +261,7 @@ define([
     var cartesian2Scratch = new Cartesian2();
 
     var elementNames = ['x', 'y', 'z', 'w'];
-    var elementSizeNames = ['', 'float', 'vec2', 'vec3', 'vec4'];
+    var variableSizeNames = ['', 'float', 'vec2', 'vec3', 'vec4'];
 
     function getSubAttributeSourceVariableName(compressedAttributeBaseName, attribute) {
         if (attribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS) {

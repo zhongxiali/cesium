@@ -1,9 +1,11 @@
 /*global define*/
 define([
         './AttributeCompression',
+        './AttributePacker',
         './Cartesian2',
         './Cartesian3',
         './ComponentDatatype',
+        './CompressedAttributeType',
         './defaultValue',
         './defined',
         './Math',
@@ -12,9 +14,11 @@ define([
         './TerrainQuantization'
     ], function(
         AttributeCompression,
+        AttributePacker,
         Cartesian2,
         Cartesian3,
         ComponentDatatype,
+        CompressedAttributeType,
         defaultValue,
         defined,
         CesiumMath,
@@ -155,138 +159,53 @@ define([
          */
         this.hasWebMercatorY = defaultValue(hasWebMercatorY, false);
 
-        /**
-         * The index of the vertex height, or -1 if there is no vertex height.
-         * @type {Number}
-         */
-        this.vertexHeightIndex = -1;
+        var attrType = this.quantization === TerrainQuantization.BITS12 ? CompressedAttributeType.TWELVE_BITS : CompressedAttributeType.FLOAT;
 
-        /**
-         * True if the vertex height is the second element of a compressed texture coordinate pair.
-         * This property is ignored when {@link TerrainEncoding#quantization} is NONE.
-         * @type {Boolean}
-         */
-        this.vertexHeightIsSecond = false;
+        var packer = this._packer = new AttributePacker();
+        packer.addAttribute('position', 3, attrType);
 
-        /**
-         * The index of the vertical Web Mercator texture coordinate, or -1 if there is no Web Mercator
-         * texture coordinate.
-         * @type {Number}
-         */
-        this.webMercatorYIndex = -1;
+        if (this.hasVertexHeight) {
+            packer.addAttribute('height', 1, attrType);
+        }
 
-        /**
-         * True if the Web Mercator texture coordinate is the second element of a compressed texture coordinate pair.
-         * This property is ignored when {@link TerrainEncoding#quantization} is NONE.
-         * @type {Boolean}
-         */
-        this.webMercatorYIsSecond = false;
+        if (this.hasWebMercatorY) {
+            packer.addAttribute('webMercatorY', 1, attrType);
+        }
 
-        /**
-         * The index of the vertex normal, or -1 if there is no vertex normal.
-         * @type {Number}
-         */
-        this.vertexNormalIndex = -1;
+        packer.addAttribute('textureCoordinates', 2, attrType);
 
-        if (this.quantization === TerrainQuantization.BITS12) {
-            if (this.hasWebMercatorY) {
-                this.webMercatorYIndex = 1;
-                this.webMercatorYIsSecond = true;
-            }
-            var compressedIndex = 2;
-            if (this.hasVertexHeight) {
-                if (this.hasWebMercatorY) {
-                    this.vertexHeightIndex = ++compressedIndex;
-                    this.vertexHeightIsSecond = false;
-                } else {
-                    this.vertexHeightIndex = 1;
-                    this.vertexHeightIsSecond = true;
-                }
-            }
-            if (this.hasVertexNormals) {
-                this.vertexNormalIndex = ++compressedIndex;
-            }
-        } else {
-            var index = 4;
-            if (this.hasWebMercatorY) {
-                this.webMercatorYIndex = ++index;
-            }
-            if (this.hasVertexHeight) {
-                this.vertexHeightIndex = ++index;
-            }
-            if (this.hasVertexNormals) {
-                this.vertexHeightIndex = ++index;
-            }
+        if (this.hasVertexNormals) {
+            packer.addAttribute('normal', 1, CompressedAttributeType.FLOAT);
         }
     }
 
-    TerrainEncoding.prototype.encode = function(vertexBuffer, bufferIndex, position, uv, height, normalToPack, webMercatorY) {
-        var u = uv.x;
-        var v = uv.y;
+    var vertexScratch = {
+        position: new Cartesian3(),
+        textureCoordinates: new Cartesian2(),
+        height: 0.0,
+        webMercatorY: 0.0,
+        normal: 0.0
+    };
 
+    TerrainEncoding.prototype.encode = function(vertexBuffer, vertexIndex, position, uv, height, normalToPack, webMercatorY) {
         if (this.quantization === TerrainQuantization.BITS12) {
-            position = Matrix4.multiplyByPoint(this.toScaledENU, position, cartesian3Scratch);
-
-            position.x = CesiumMath.clamp(position.x, 0.0, 1.0);
-            position.y = CesiumMath.clamp(position.y, 0.0, 1.0);
-            position.z = CesiumMath.clamp(position.z, 0.0, 1.0);
+            var positionScaledEnu = Matrix4.multiplyByPoint(this.toScaledENU, position, vertexScratch.position);
+            positionScaledEnu.x = CesiumMath.clamp(positionScaledEnu.x, 0.0, 1.0);
+            positionScaledEnu.y = CesiumMath.clamp(positionScaledEnu.y, 0.0, 1.0);
+            positionScaledEnu.z = CesiumMath.clamp(positionScaledEnu.z, 0.0, 1.0);
 
             var hDim = this.maximumHeight - this.minimumHeight;
-            var h = CesiumMath.clamp((height - this.minimumHeight) / hDim, 0.0, 1.0);
-
-            // First float is X and Y position.
-            Cartesian2.fromElements(position.x, position.y, cartesian2Scratch);
-            var compressed0 = AttributeCompression.compressTextureCoordinates(cartesian2Scratch);
-
-            // Second float is Z position and either Web Mercator texture coordinate or height.
-            var secondElement = this.hasWebMercatorY ? webMercatorY : h;
-            Cartesian2.fromElements(position.z, secondElement, cartesian2Scratch);
-            var compressed1 = AttributeCompression.compressTextureCoordinates(cartesian2Scratch);
-
-            // Third float is geographic U and V.
-            Cartesian2.fromElements(u, v, cartesian2Scratch);
-            var compressed2 = AttributeCompression.compressTextureCoordinates(cartesian2Scratch);
-
-            vertexBuffer[bufferIndex++] = compressed0;
-            vertexBuffer[bufferIndex++] = compressed1;
-            vertexBuffer[bufferIndex++] = compressed2;
-
-            // Fourth float is height if it exists and was not already included, or vertex normal if it
-            // exists, or nothing.
-            if (this.hasVertexHeight && this.hasWebMercatorY) {
-                vertexBuffer[bufferIndex++] = height;
-            } else if (this.hasVertexNormals) {
-                vertexBuffer[bufferIndex++] = AttributeCompression.octPackFloat(normalToPack);
-            }
-
-            // Fifth float is vertex normal if we have Web Mercator texture coordinate, height, AND
-            // vertex normal.
-            if (this.hasVertexHeight && this.hasWebMercatorY && this.hasVertexNormals) {
-                vertexBuffer[bufferIndex++] = AttributeCompression.octPackFloat(normalToPack);
-            }
+            vertexScratch.height = CesiumMath.clamp((height - this.minimumHeight) / hDim, 0.0, 1.0);
         } else {
-            Cartesian3.subtract(position, this.center, cartesian3Scratch);
-
-            vertexBuffer[bufferIndex++] = cartesian3Scratch.x;
-            vertexBuffer[bufferIndex++] = cartesian3Scratch.y;
-            vertexBuffer[bufferIndex++] = cartesian3Scratch.z;
-            vertexBuffer[bufferIndex++] = u;
-            vertexBuffer[bufferIndex++] = v;
-
-            if (this.hasWebMercatorY) {
-                vertexBuffer[bufferIndex++] = webMercatorY;
-            }
-
-            if (this.hasVertexHeight) {
-                vertexBuffer[bufferIndex++] = height;
-            }
-
-            if (this.hasVertexNormals) {
-                vertexBuffer[bufferIndex++] = AttributeCompression.octPackFloat(normalToPack);
-            }
+            Cartesian3.clone(position, vertexScratch.position);
+            vertexScratch.height = height;
         }
 
-        return bufferIndex;
+        Cartesian2.clone(uv, vertexScratch.textureCoordinates);        
+        vertexScratch.webMercatorY = webMercatorY;
+        vertexScratch.normal = AttributeCompression.octPackFloat(normalToPack);
+
+        this.packer.putVertex(vertexBuffer, vertexIndex, vertexScratch);
     };
 
     TerrainEncoding.prototype.decodePosition = function(buffer, index, result) {
@@ -348,8 +267,6 @@ define([
             return undefined;
         }
 
-        var stride = this.getStride();
-
         var temp = buffer[index + this.vertexNormalIndex] / 256.0;
         var x = Math.floor(temp);
         var y = (temp - x) * 256.0;
@@ -378,80 +295,12 @@ define([
         return vertexStride;
     };
 
-    var attributesNone = {
-        position3DAndHeightOrWebMercatorY : 0,
-        textureCoordAndEncodedNormals : 1
-    };
-    var attributes = {
-        compressed0 : 0,
-        compressed1 : 1
-    };
-
     TerrainEncoding.prototype.getAttributes = function(buffer) {
-        var datatype = ComponentDatatype.FLOAT;
-
-        if (this.quantization === TerrainQuantization.NONE) {
-            var sizeInBytes = ComponentDatatype.getSizeInBytes(datatype);
-            var position3DAndHeightLength = 4;
-            var numTexCoordComponents = this.hasVertexNormals ? 3 : 2;
-            var stride = (this.hasVertexNormals ? 7 : 6) * sizeInBytes;
-
-            if (this.hasWebMercatorY) {
-                ++numTexCoordComponents;
-                stride += sizeInBytes;
-            }
-
-            return [{
-                index : attributesNone.position3DAndHeight,
-                vertexBuffer : buffer,
-                componentDatatype : datatype,
-                componentsPerAttribute : position3DAndHeightLength,
-                offsetInBytes : 0,
-                strideInBytes : stride
-            }, {
-                index : attributesNone.textureCoordAndEncodedNormals,
-                vertexBuffer : buffer,
-                componentDatatype : datatype,
-                componentsPerAttribute : numTexCoordComponents,
-                offsetInBytes : position3DAndHeightLength * sizeInBytes,
-                strideInBytes : stride
-            }];
-        }
-
-        var vertexStride = this.getStride();
-
-        if (vertexStride <= 4) {
-            return [{
-                index : attributes.compressed0,
-                vertexBuffer : buffer,
-                componentDatatype : datatype,
-                componentsPerAttribute : vertexStride
-            }];
-        } else {
-            return [{
-                index : attributes.compressed0,
-                vertexBuffer : buffer,
-                componentDatatype : datatype,
-                componentsPerAttribute : vertexStride,
-                offsetInBytes : 0,
-                strideInBytes : vertexStride * sizeInBytes
-            }, {
-                index : attributes.compressed1,
-                vertexBuffer : buffer,
-                componentDatatype : datatype,
-                componentsPerAttribute : vertexStride - 4,
-                offsetInBytes : 4 * sizeInBytes,
-                strideInBytes : vertexStride * sizeInBytes
-            }];
-        }
+        return this.packer.getWebGLAttributeList(buffer);
     };
 
     TerrainEncoding.prototype.getAttributeLocations = function() {
-        if (this.quantization === TerrainQuantization.NONE) {
-            return attributesNone;
-        } else {
-            return attributes;
-        }
+        this.packer.getAttributeLocations();
     };
 
     TerrainEncoding.clone = function(encoding, result) {
@@ -467,7 +316,9 @@ define([
         result.fromScaledENU = Matrix4.clone(encoding.fromScaledENU);
         result.matrix = Matrix4.clone(encoding.matrix);
         result.hasVertexNormals = encoding.hasVertexNormals;
+        result.hasVertexHeight = encoding.hasVertexHeight;
         result.hasWebMercatorY = encoding.hasWebMercatorY;
+        result.packer = encoding.packer;
         return result;
     };
 

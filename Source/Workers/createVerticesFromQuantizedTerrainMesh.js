@@ -168,7 +168,7 @@ define([
                 }
             }
 
-            bufferIndex = encoding.encode(vertexBuffer, bufferIndex, positions[j], uvs[j], heights[j], toPack, webMercatorYs[j]);
+            encoding.encode(vertexBuffer, j, positions[j], uvs[j], heights[j], toPack, webMercatorYs[j]);
         }
 
         var edgeTriangleCount = Math.max(0, (edgeVertexCount - 4) * 2);

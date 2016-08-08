@@ -124,7 +124,7 @@ define([
      * });
      *
      * var encoding = statistics.encoding;
-     * var position = encoding.decodePosition(statistics.vertices, index * encoding.getStride());
+     * var position = encoding.decodePosition(statistics.vertices, index);
      */
     HeightmapTessellator.computeVertices = function(options) {
         //>>includeStart('debug', pragmas.debug);
@@ -394,7 +394,7 @@ define([
 
         var bufferIndex = 0;
         for (var j = 0; j < size; ++j) {
-            bufferIndex = encoding.encode(vertices, bufferIndex, positions[j], uvs[j], heights[j], undefined, webMercatorYs[j]);
+            encoding.encode(vertices, j, positions[j], uvs[j], heights[j], undefined, webMercatorYs[j]);
         }
 
         return {

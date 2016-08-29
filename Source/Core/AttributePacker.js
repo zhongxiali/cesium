@@ -4,12 +4,16 @@ define([
         './Cartesian2',
         './ComponentDatatype',
         './CompressedAttributeType',
+        './defined',
+        './defineProperties',
         './DeveloperError'
     ], function(
         AttributeCompression,
         Cartesian2,
         ComponentDatatype,
         CompressedAttributeType,
+        defined,
+        defineProperties,
         DeveloperError
     ) {
     'use strict';
@@ -25,6 +29,14 @@ define([
         this._get = undefined;
         this._put = undefined;
     }
+
+    defineProperties(AttributePacker.prototype, {
+        numberOfFloats: {
+            get: function() {
+                return this._numberOfFloats;
+            }
+        }
+    });
 
     AttributePacker.prototype.addAttribute = function(name, numberOfElements, compressedAttributeType) {
         //>>includeStart('debug', pragmas.debug);
@@ -46,7 +58,9 @@ define([
             isFirstHalf: undefined,
 
             parentAttribute: undefined,
-            subAttributes: []
+            subAttributes: [],
+
+            getFunction: undefined
         };
 
         this._attributes.push(parent);
@@ -63,7 +77,9 @@ define([
                 isFirstHalf: undefined,
 
                 parentAttribute: parent,
-                subAttributes: undefined
+                subAttributes: undefined,
+
+                getFunction: undefined
             };
 
             this._flatAttributes.push(child);
@@ -184,7 +200,58 @@ define([
         return this._get(AttributeCompression, cartesian2Scratch, buffer, index * this._numberOfFloats, result);
     };
 
-    AttributePacker.prototype.createSingleAttributeGetFunction = function(attributeName) {
+    var getArguments = ['AttributeCompression', 'cartesian2Scratch', 'buffer', 'index', 'result'];
+    var putArguments = ['AttributeCompression', 'cartesian2Scratch', 'buffer', 'index', 'vertex'];
+
+    AttributePacker.prototype.createSingleAttributeGetFunction = function(attributeName, defaultValue) {
+        var attribute = this._attributes.filter(function(attr) { return attr.name === attributeName; });
+        if (!defined(attribute)) {
+            return function() {
+                return defaultValue;
+            };
+        }
+
+        if (defined(attribute.getFunction)) {
+            return attribute.getFunction;
+        }
+
+        var subAttributes = attribute.subAttributes;
+
+        var code = [];
+
+        for (var i = 0; i < subAttributes.length; ++i) {
+            var subAttribute = subAttributes[i];
+            var offset = subAttribute.attributeIndex * 4 + subAttribute.elementIndex;
+            if (subAttribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS) {
+                if (subAttribute.isFirstHalf || i === 0) {
+                    code.push('AttributeCompression.decompressTextureCoordinates(buffer[index + ' + offset + '], cartesian2Scratch);');
+                }
+
+                var source = subAttribute.isFirstHalf ? 'cartesian2Scratch.x' : 'cartesian2Scratch.y';
+                if (subAttributes.length === 1) {
+                    code.push('return ' + source + ';');
+                } else {
+                    code.push('result.' + elementNames[subAttribute.subAttrNumber] + ' = ' + source + ';');
+                }
+            } else {
+                if (subAttributes.length === 1) {
+                    code.push('return buffer[index + ' + offset + '];');
+                } else {
+                    code.push('result.' + elementNames[subAttribute.subAttrNumber] + ' = buffer[index + ' + offset + '];');
+                }
+            }
+        }
+
+        if (subAttributes.length > 1) {
+            code.push('return result;');
+        }
+
+        // Yes, this is a form of eval.  It's also much faster than the alternatives.
+        var getter = new Function(getArguments, code.join('\n')); // jshint ignore:line
+        attribute.getFunction = function(buffer, index, result) {
+            return getter(AttributeCompression, cartesian2Scratch, buffer, index, result);
+        };
+        return attribute.getFunction;
     };
 
     function computeStorage(packer) {
@@ -195,9 +262,6 @@ define([
         var twelveBits = packer._flatAttributes.filter(function(attribute) {
             return attribute.compressedAttributeType === CompressedAttributeType.TWELVE_BITS;
         });
-
-        var getArguments = ['AttributeCompression', 'cartesian2Scratch', 'buffer', 'index', 'result'];
-        var putArguments = ['AttributeCompression', 'cartesian2Scratch', 'buffer', 'index', 'vertex'];
 
         var get = '';
         var put = '';

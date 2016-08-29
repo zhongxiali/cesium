@@ -122,8 +122,8 @@ define([
         }
     });
 
-    function getPosition(encoding, mode, projection, vertices, index, result) {
-        encoding.decodePosition(vertices, index, result);
+    function getPosition(encoding, mode, projection, vertices, vertexIndex, result) {
+        encoding.decodePosition(vertices, vertexIndex, result);
 
         if (defined(mode) && mode !== SceneMode.SCENE3D) {
             var ellipsoid = projection.ellipsoid;

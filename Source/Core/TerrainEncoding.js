@@ -29,7 +29,6 @@ define([
 
     var cartesian3Scratch = new Cartesian3();
     var cartesian3DimScratch = new Cartesian3();
-    var cartesian2Scratch = new Cartesian2();
     var matrix4Scratch = new Matrix4();
     var matrix4Scratch2 = new Matrix4();
 
@@ -161,7 +160,7 @@ define([
 
         var attrType = this.quantization === TerrainQuantization.BITS12 ? CompressedAttributeType.TWELVE_BITS : CompressedAttributeType.FLOAT;
 
-        var packer = this._packer = new AttributePacker();
+        var packer = this.packer = new AttributePacker();
         packer.addAttribute('position', 3, attrType);
 
         if (this.hasVertexHeight) {
@@ -177,6 +176,13 @@ define([
         if (this.hasVertexNormals) {
             packer.addAttribute('normal', 1, CompressedAttributeType.FLOAT);
         }
+
+        // Create the functions to get individual vertex attributes from the buffer.
+        this.positionGetter = packer.createSingleAttributeGetFunction('position');
+        this.heightGetter = packer.createSingleAttributeGetFunction('height');
+        this.webMercatorYGetter = packer.createSingleAttributeGetFunction('webMercatorY');
+        this.textureCoordinatesGetter = packer.createSingleAttributeGetFunction('textureCoordinates');
+        this.normalGetter = packer.createSingleAttributeGetFunction('normal');
     }
 
     var vertexScratch = {
@@ -197,102 +203,58 @@ define([
             var hDim = this.maximumHeight - this.minimumHeight;
             vertexScratch.height = CesiumMath.clamp((height - this.minimumHeight) / hDim, 0.0, 1.0);
         } else {
-            Cartesian3.clone(position, vertexScratch.position);
+            Cartesian3.subtract(position, this.center, vertexScratch.position);
             vertexScratch.height = height;
         }
 
-        Cartesian2.clone(uv, vertexScratch.textureCoordinates);        
+        Cartesian2.clone(uv, vertexScratch.textureCoordinates);
         vertexScratch.webMercatorY = webMercatorY;
         vertexScratch.normal = AttributeCompression.octPackFloat(normalToPack);
 
         this.packer.putVertex(vertexBuffer, vertexIndex, vertexScratch);
     };
 
-    TerrainEncoding.prototype.decodePosition = function(buffer, index, result) {
+    TerrainEncoding.prototype.decodePosition = function(buffer, vertexIndex, result) {
         if (!defined(result)) {
             result = new Cartesian3();
         }
 
-        index *= this.getStride();
+        this.positionGetter(buffer, vertexIndex, result);
 
         if (this.quantization === TerrainQuantization.BITS12) {
-            var xy = AttributeCompression.decompressTextureCoordinates(buffer[index], cartesian2Scratch);
-            result.x = xy.x;
-            result.y = xy.y;
-
-            var zh = AttributeCompression.decompressTextureCoordinates(buffer[index + 1], cartesian2Scratch);
-            result.z = zh.x;
-
             return Matrix4.multiplyByPoint(this.fromScaledENU, result, result);
+        } else {
+            return Cartesian3.add(result, this.center, result);
         }
-
-        result.x = buffer[index];
-        result.y = buffer[index + 1];
-        result.z = buffer[index + 2];
-        return Cartesian3.add(result, this.center, result);
     };
 
-    TerrainEncoding.prototype.decodeTextureCoordinates = function(buffer, index, result) {
+    TerrainEncoding.prototype.decodeTextureCoordinates = function(buffer, vertexIndex, result) {
         if (!defined(result)) {
             result = new Cartesian2();
         }
 
-        index *= this.getStride();
-
-        if (this.quantization === TerrainQuantization.BITS12) {
-            return AttributeCompression.decompressTextureCoordinates(buffer[index + 2], result);
-        }
-
-        return Cartesian2.fromElements(buffer[index + 3], buffer[index + 4], result);
+        return this.normalGetter(buffer, vertexIndex, result);
     };
 
-    TerrainEncoding.prototype.decodeHeight = function(buffer, index) {
-        if (!this.hasVertexHeight) {
-            return undefined;
-        }
-
-        index *= this.getStride();
+    TerrainEncoding.prototype.decodeHeight = function(buffer, vertexIndex) {
+        var height = this.heightGetter(buffer, vertexIndex);
 
         if (this.quantization === TerrainQuantization.BITS12) {
-            var pq = AttributeCompression.decompressTextureCoordinates(buffer[index + this.vertexHeightIndex], cartesian2Scratch);
-            var height = this.vertexHeightIsSecond ? pq.y : pq.x;
-            return height * (this.maximumHeight - this.minimumHeight) + this.minimumHeight;
+            height = height * (this.maximumHeight - this.minimumHeight) + this.minimumHeight;
         }
 
-        return buffer[index + this.vertexHeightIndex];
+        return height;
     };
 
-    TerrainEncoding.prototype.getOctEncodedNormal = function(buffer, index, result) {
-        if (!this.hasVertexNormals) {
-            return undefined;
-        }
-
-        var temp = buffer[index + this.vertexNormalIndex] / 256.0;
+    TerrainEncoding.prototype.getOctEncodedNormal = function(buffer, vertexIndex, result) {
+        var temp = this.normalGetter(buffer, vertexIndex) / 256.0;
         var x = Math.floor(temp);
         var y = (temp - x) * 256.0;
-
         return Cartesian2.fromElements(x, y, result);
     };
 
     TerrainEncoding.prototype.getStride = function() {
-        var vertexStride;
-
-        switch (this.quantization) {
-            case TerrainQuantization.BITS12:
-                vertexStride = this.hasVertexHeight && this.hasWebMercatorY ? 4 : 3;
-                break;
-            default:
-                vertexStride = 5;
-                vertexStride += this.hasVertexHeight ? 1 : 0;
-                vertexStride += this.hasWebMercatorY ? 1 : 0;
-                break;
-        }
-
-        if (this.hasVertexNormals) {
-            ++vertexStride;
-        }
-
-        return vertexStride;
+        return this.packer.numberOfFloats;
     };
 
     TerrainEncoding.prototype.getAttributes = function(buffer) {
@@ -319,6 +281,11 @@ define([
         result.hasVertexHeight = encoding.hasVertexHeight;
         result.hasWebMercatorY = encoding.hasWebMercatorY;
         result.packer = encoding.packer;
+        result.positionGetter = encoding.positionGetter;
+        result.heightGetter = encoding.heightGetter;
+        result.webMercatorYGetter = encoding.webMercatorYGetter;
+        result.textureCoordinatesGetter = encoding.textureCoordinatesGetter;
+        result.normalGetter = encoding.normalGetter;
         return result;
     };
 

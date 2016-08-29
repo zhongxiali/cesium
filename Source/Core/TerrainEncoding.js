@@ -150,7 +150,7 @@ define([
          * The terrain mesh contains heights.  This is generally only needed in Columbus View.
          * @type {Boolean}
          */
-        this.hasVertexHeight = hasVertexHeight;
+        this.hasVertexHeight = defaultValue(hasVertexHeight, true);
 
         /**
          * The terrain mesh contains a vertical texture coordinate following the Web Mercator projection.
@@ -209,7 +209,10 @@ define([
 
         Cartesian2.clone(uv, vertexScratch.textureCoordinates);
         vertexScratch.webMercatorY = webMercatorY;
-        vertexScratch.normal = AttributeCompression.octPackFloat(normalToPack);
+
+        if (this.hasVertexNormals) {
+            vertexScratch.normal = AttributeCompression.octPackFloat(normalToPack);
+        }
 
         this.packer.putVertex(vertexBuffer, vertexIndex, vertexScratch);
     };
@@ -233,7 +236,7 @@ define([
             result = new Cartesian2();
         }
 
-        return this.normalGetter(buffer, vertexIndex, result);
+        return this.textureCoordinatesGetter(buffer, vertexIndex, result);
     };
 
     TerrainEncoding.prototype.decodeHeight = function(buffer, vertexIndex) {
@@ -262,7 +265,7 @@ define([
     };
 
     TerrainEncoding.prototype.getAttributeLocations = function() {
-        this.packer.getAttributeLocations();
+        return this.packer.getWebGLAttributeLocations('packedAttributes');
     };
 
     TerrainEncoding.clone = function(encoding, result) {

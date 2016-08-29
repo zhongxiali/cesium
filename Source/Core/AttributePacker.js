@@ -204,7 +204,9 @@ define([
     var putArguments = ['AttributeCompression', 'cartesian2Scratch', 'buffer', 'index', 'vertex'];
 
     AttributePacker.prototype.createSingleAttributeGetFunction = function(attributeName, defaultValue) {
-        var attribute = this._attributes.filter(function(attr) { return attr.name === attributeName; });
+        computeStorage(this);
+
+        var attribute = this._attributes.filter(function(attr) { return attr.name === attributeName; })[0];
         if (!defined(attribute)) {
             return function() {
                 return defaultValue;

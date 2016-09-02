@@ -145,7 +145,6 @@ define([
         var size = quantizedVertexCount * vertexStride + edgeVertexCount * vertexStride;
         var vertexBuffer = new Float32Array(size);
 
-        var bufferIndex = 0;
         for (var j = 0; j < quantizedVertexCount; ++j) {
             if (hasVertexNormals) {
                 var n = j * 2.0;
@@ -198,7 +197,7 @@ define([
             maximumHeight : maximumHeight,
             boundingSphere : boundingSphere,
             orientedBoundingBox : orientedBoundingBox,
-            encoding : encoding,
+            encoding : TerrainEncoding.clone(encoding),
             skirtIndex : parameters.indices.length
         };
     }

@@ -250,8 +250,9 @@ define([
 
         // Yes, this is a form of eval.  It's also much faster than the alternatives.
         var getter = new Function(getArguments, code.join('\n')); // jshint ignore:line
+        var that = this;
         attribute.getFunction = function(buffer, index, result) {
-            return getter(AttributeCompression, cartesian2Scratch, buffer, index, result);
+            return getter(AttributeCompression, cartesian2Scratch, buffer, index * that._numberOfFloats, result);
         };
         return attribute.getFunction;
     };

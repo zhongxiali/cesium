@@ -158,31 +158,44 @@ define([
          */
         this.hasWebMercatorY = defaultValue(hasWebMercatorY, false);
 
-        var attrType = this.quantization === TerrainQuantization.BITS12 ? CompressedAttributeType.TWELVE_BITS : CompressedAttributeType.FLOAT;
+        this.packer = undefined;
+        this.positionGetter = undefined;
+        this.heightGetter = undefined;
+        this.webMercatorYGetter = undefined;
+        this.textureCoordinatesGetter = undefined;
+        this.normalGetter = undefined;
+   }
 
-        var packer = this.packer = new AttributePacker();
+    function createPacker(terrainEncoding) {
+        if (defined(terrainEncoding.packer)) {
+            return;
+        }
+
+        var attrType = terrainEncoding.quantization === TerrainQuantization.BITS12 ? CompressedAttributeType.TWELVE_BITS : CompressedAttributeType.FLOAT;
+
+        var packer = terrainEncoding.packer = new AttributePacker();
         packer.addAttribute('position', 3, attrType);
 
-        if (this.hasVertexHeight) {
+        if (terrainEncoding.hasVertexHeight) {
             packer.addAttribute('height', 1, attrType);
         }
 
-        if (this.hasWebMercatorY) {
+        if (terrainEncoding.hasWebMercatorY) {
             packer.addAttribute('webMercatorY', 1, attrType);
         }
 
         packer.addAttribute('textureCoordinates', 2, attrType);
 
-        if (this.hasVertexNormals) {
+        if (terrainEncoding.hasVertexNormals) {
             packer.addAttribute('normal', 1, CompressedAttributeType.FLOAT);
         }
 
         // Create the functions to get individual vertex attributes from the buffer.
-        this.positionGetter = packer.createSingleAttributeGetFunction('position');
-        this.heightGetter = packer.createSingleAttributeGetFunction('height');
-        this.webMercatorYGetter = packer.createSingleAttributeGetFunction('webMercatorY');
-        this.textureCoordinatesGetter = packer.createSingleAttributeGetFunction('textureCoordinates');
-        this.normalGetter = packer.createSingleAttributeGetFunction('normal');
+        terrainEncoding.positionGetter = packer.createSingleAttributeGetFunction('position');
+        terrainEncoding.heightGetter = packer.createSingleAttributeGetFunction('height');
+        terrainEncoding.webMercatorYGetter = packer.createSingleAttributeGetFunction('webMercatorY');
+        terrainEncoding.textureCoordinatesGetter = packer.createSingleAttributeGetFunction('textureCoordinates');
+        terrainEncoding.normalGetter = packer.createSingleAttributeGetFunction('normal');
     }
 
     var vertexScratch = {
@@ -194,6 +207,8 @@ define([
     };
 
     TerrainEncoding.prototype.encode = function(vertexBuffer, vertexIndex, position, uv, height, normalToPack, webMercatorY) {
+        createPacker(this);
+
         if (this.quantization === TerrainQuantization.BITS12) {
             var positionScaledEnu = Matrix4.multiplyByPoint(this.toScaledENU, position, vertexScratch.position);
             positionScaledEnu.x = CesiumMath.clamp(positionScaledEnu.x, 0.0, 1.0);
@@ -218,6 +233,8 @@ define([
     };
 
     TerrainEncoding.prototype.decodePosition = function(buffer, vertexIndex, result) {
+        createPacker(this);
+
         if (!defined(result)) {
             result = new Cartesian3();
         }
@@ -232,6 +249,8 @@ define([
     };
 
     TerrainEncoding.prototype.decodeTextureCoordinates = function(buffer, vertexIndex, result) {
+        createPacker(this);
+
         if (!defined(result)) {
             result = new Cartesian2();
         }
@@ -240,6 +259,8 @@ define([
     };
 
     TerrainEncoding.prototype.decodeHeight = function(buffer, vertexIndex) {
+        createPacker(this);
+
         var height = this.heightGetter(buffer, vertexIndex);
 
         if (this.quantization === TerrainQuantization.BITS12) {
@@ -250,6 +271,8 @@ define([
     };
 
     TerrainEncoding.prototype.getOctEncodedNormal = function(buffer, vertexIndex, result) {
+        createPacker(this);
+
         var temp = this.normalGetter(buffer, vertexIndex) / 256.0;
         var x = Math.floor(temp);
         var y = (temp - x) * 256.0;
@@ -257,14 +280,17 @@ define([
     };
 
     TerrainEncoding.prototype.getStride = function() {
+        createPacker(this);
         return this.packer.numberOfFloats;
     };
 
     TerrainEncoding.prototype.getAttributes = function(buffer) {
+        createPacker(this);
         return this.packer.getWebGLAttributeList(buffer);
     };
 
     TerrainEncoding.prototype.getAttributeLocations = function() {
+        createPacker(this);
         return this.packer.getWebGLAttributeLocations('packedAttributes');
     };
 
@@ -283,12 +309,6 @@ define([
         result.hasVertexNormals = encoding.hasVertexNormals;
         result.hasVertexHeight = encoding.hasVertexHeight;
         result.hasWebMercatorY = encoding.hasWebMercatorY;
-        result.packer = encoding.packer;
-        result.positionGetter = encoding.positionGetter;
-        result.heightGetter = encoding.heightGetter;
-        result.webMercatorYGetter = encoding.webMercatorYGetter;
-        result.textureCoordinatesGetter = encoding.textureCoordinatesGetter;
-        result.normalGetter = encoding.normalGetter;
         return result;
     };
 

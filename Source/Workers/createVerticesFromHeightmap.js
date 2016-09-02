@@ -3,11 +3,13 @@ define([
         '../Core/Ellipsoid',
         '../Core/HeightmapTessellator',
         '../Core/Rectangle',
+        '../Core/TerrainEncoding',
         './createTaskProcessorWorker'
     ], function(
         Ellipsoid,
         HeightmapTessellator,
         Rectangle,
+        TerrainEncoding,
         createTaskProcessorWorker) {
     'use strict';
 
@@ -37,7 +39,7 @@ define([
             boundingSphere3D : statistics.boundingSphere3D,
             orientedBoundingBox : statistics.orientedBoundingBox,
             occludeePointInScaledSpace : statistics.occludeePointInScaledSpace,
-            encoding : statistics.encoding
+            encoding : TerrainEncoding.clone(statistics.encoding)
         };
     }
 

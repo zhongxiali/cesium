@@ -182,7 +182,7 @@ define([
                 rhs = variableSizeNames[attribute.numberOfElements] + '(' + rhsParts.join(', ') + ')';
             }
 
-            lines.push(variableSizeNames[attribute.numberOfElements] + ' ' + attribute.name + ' = ' + rhs + ';');
+            lines.push(attribute.name + ' = ' + rhs + ';');
         });
 
         return lines.join('\n');

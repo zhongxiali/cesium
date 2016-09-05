@@ -163,7 +163,7 @@ define([
         this.heightGetter = undefined;
         this.webMercatorYGetter = undefined;
         this.textureCoordinatesGetter = undefined;
-        this.normalGetter = undefined;
+        this.encodedNormalGetter = undefined;
    }
 
     function createPacker(terrainEncoding) {
@@ -187,7 +187,7 @@ define([
         packer.addAttribute('textureCoordinates', 2, attrType);
 
         if (terrainEncoding.hasVertexNormals) {
-            packer.addAttribute('normal', 1, CompressedAttributeType.FLOAT);
+            packer.addAttribute('encodedNormal', 1, CompressedAttributeType.FLOAT);
         }
 
         // Create the functions to get individual vertex attributes from the buffer.
@@ -195,7 +195,7 @@ define([
         terrainEncoding.heightGetter = packer.createSingleAttributeGetFunction('height');
         terrainEncoding.webMercatorYGetter = packer.createSingleAttributeGetFunction('webMercatorY');
         terrainEncoding.textureCoordinatesGetter = packer.createSingleAttributeGetFunction('textureCoordinates');
-        terrainEncoding.normalGetter = packer.createSingleAttributeGetFunction('normal');
+        terrainEncoding.encodedNormalGetter = packer.createSingleAttributeGetFunction('encodedNormal');
     }
 
     var vertexScratch = {
@@ -203,7 +203,7 @@ define([
         textureCoordinates: new Cartesian2(),
         height: 0.0,
         webMercatorY: 0.0,
-        normal: 0.0
+        encodedNormal: 0.0
     };
 
     TerrainEncoding.prototype.encode = function(vertexBuffer, vertexIndex, position, uv, height, normalToPack, webMercatorY) {
@@ -226,7 +226,7 @@ define([
         vertexScratch.webMercatorY = webMercatorY;
 
         if (this.hasVertexNormals) {
-            vertexScratch.normal = AttributeCompression.octPackFloat(normalToPack);
+            vertexScratch.encodedNormal = AttributeCompression.octPackFloat(normalToPack);
         }
 
         this.packer.putVertex(vertexBuffer, vertexIndex, vertexScratch);
@@ -273,7 +273,7 @@ define([
     TerrainEncoding.prototype.getOctEncodedNormal = function(buffer, vertexIndex, result) {
         createPacker(this);
 
-        var temp = this.normalGetter(buffer, vertexIndex) / 256.0;
+        var temp = this.encodedNormalGetter(buffer, vertexIndex) / 256.0;
         var x = Math.floor(temp);
         var y = (temp - x) * 256.0;
         return Cartesian2.fromElements(x, y, result);
@@ -289,9 +289,21 @@ define([
         return this.packer.getWebGLAttributeList(buffer);
     };
 
+    var glslAttributeName = 'packedAttributes';
+
     TerrainEncoding.prototype.getAttributeLocations = function() {
         createPacker(this);
-        return this.packer.getWebGLAttributeLocations('packedAttributes');
+        return this.packer.getWebGLAttributeLocations(glslAttributeName);
+    };
+
+    TerrainEncoding.prototype.getGlslAttributeDeclarations = function() {
+        createPacker(this);
+        return this.packer.getGlslAttributeDeclarations(glslAttributeName);
+    };
+
+    TerrainEncoding.prototype.getGlslUnpackingCode = function() {
+        createPacker(this);
+        return this.packer.getGlslUnpackingCode(glslAttributeName)
     };
 
     TerrainEncoding.clone = function(encoding, result) {

@@ -67,11 +67,6 @@ define([
         var quantizationDefine = '';
 
         var terrainEncoding = surfaceTile.pickTerrain.mesh.encoding;
-        var quantizationMode = terrainEncoding.quantization;
-        if (quantizationMode === TerrainQuantization.BITS12) {
-            quantization = 1;
-            quantizationDefine = 'QUANTIZATION_BITS12';
-        }
 
         var sceneMode = frameState.mode;
         var flags = sceneMode |
@@ -185,6 +180,7 @@ define([
 
             fs.sources.push(computeDayColor);
 
+            vs.sources.push('void unpackVertexAttributes()\n{\n' + terrainEncoding.getGlslUnpackingCode() + '\n}\n');
             vs.sources.push(getPositionMode(sceneMode));
             vs.sources.push(get2DYPositionFraction(useWebMercatorProjection));
 

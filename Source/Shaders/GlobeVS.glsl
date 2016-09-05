@@ -1,9 +1,5 @@
-#ifdef QUANTIZATION_BITS12
-attribute vec4 compressed;
-#else
-attribute vec4 position3DAndHeight;
-attribute vec4 textureCoordAndEncodedNormals;
-#endif
+attribute vec4 packedAttributes0;
+attribute vec4 packedAttributes1;
 
 uniform vec3 u_center3D;
 uniform mat4 u_modifiedModelView;
@@ -97,42 +93,27 @@ uniform vec2 u_minMaxHeight;
 uniform mat4 u_scaleAndBias;
 #endif
 
+// Vertex attributes, after unpacking
+void unpackVertexAttributes();
+vec3 position;
+float height;
+vec2 textureCoordinates;
+float webMercatorY;
+float encodedNormal;
+
 void main()
 {
-#ifdef QUANTIZATION_BITS12
-    vec2 xy = czm_decompressTextureCoordinates(compressed.x);
-    vec2 zh = czm_decompressTextureCoordinates(compressed.y);
-    vec3 position = vec3(xy, zh.x);
-    float height = zh.y;
-    vec2 textureCoordinates = czm_decompressTextureCoordinates(compressed.z);
-    float encodedNormal = compressed.w;
+    unpackVertexAttributes();
 
+#ifdef QUANTIZATION_BITS12
     height = height * (u_minMaxHeight.y - u_minMaxHeight.x) + u_minMaxHeight.x;
     position = (u_scaleAndBias * vec4(position, 1.0)).xyz;
-#else
-    vec3 position = position3DAndHeight.xyz;
-    float height = position3DAndHeight.w;
-
-#if defined(ENABLE_VERTEX_LIGHTING) && defined(INCLUDE_WEB_MERCATOR_Y)
-    vec3 textureCoordinates = textureCoordAndEncodedNormals.xyz;
-    float encodedNormal = textureCoordAndEncodedNormals.w;
-#elif defined(ENABLE_VERTEX_LIGHTING)
-    vec3 textureCoordinates = textureCoordAndEncodedNormals.xyy;
-    float encodedNormal = textureCoordAndEncodedNormals.z;
-#elif defined(INCLUDE_WEB_MERCATOR_Y)
-    vec3 textureCoordinates = textureCoordAndEncodedNormals.xyz;
-    float encodedNormal = 0.0;
-#else
-    vec3 textureCoordinates = vec3(textureCoordAndEncodedNormals.xy, 0.0); //textureCoordAndEncodedNormals.xyy;
-    float encodedNormal = 0.0;
-#endif
-
 #endif
 
     vec3 position3DWC = position + u_center3D;
     gl_Position = getPosition(position, height, textureCoordinates.xy);
 
-    v_textureCoordinates = textureCoordinates;
+    v_textureCoordinates = vec3(textureCoordinates, webMercatorY);
 
 #if defined(ENABLE_VERTEX_LIGHTING) || defined(GENERATE_POSITION_AND_NORMAL)
     v_positionEC = (u_modifiedModelView * vec4(position, 1.0)).xyz;

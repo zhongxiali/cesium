@@ -232,6 +232,20 @@ define([
         }
 
         this.packer.putVertex(vertexBuffer, vertexIndex, vertexScratch);
+
+        var checkPos = this.decodePosition(vertexBuffer, vertexIndex);
+        if (!Cartesian3.equalsEpsilon(checkPos, position, 1.0)) {
+            throw new DeveloperError('wat1');
+        }
+
+        var checkCoords = this.decodeTextureCoordinates(vertexBuffer, vertexIndex);
+        if (!Cartesian2.equalsEpsilon(checkCoords, uv, 1e-3)) {
+            throw new DeveloperError('wat2');
+        }
+
+        if (Math.abs(this.decodeHeight(vertexBuffer, vertexIndex) - height) > 1) {
+            throw new DeveloperError('wat3');
+        }
     };
 
     TerrainEncoding.prototype.decodePosition = function(buffer, vertexIndex, result) {
@@ -311,7 +325,7 @@ define([
 
     TerrainEncoding.prototype.getGlslUnpackingCode = function() {
         createPacker(this);
-        return this.packer.getGlslUnpackingCode(glslAttributeName)
+        return this.packer.getGlslUnpackingCode(glslAttributeName);
     };
 
     TerrainEncoding.clone = function(encoding, result) {

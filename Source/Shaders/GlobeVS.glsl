@@ -1,6 +1,3 @@
-attribute vec4 packedAttributes0;
-attribute vec4 packedAttributes1;
-
 uniform vec3 u_center3D;
 uniform mat4 u_modifiedModelView;
 uniform mat4 u_modifiedModelViewProjection;

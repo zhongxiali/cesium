@@ -120,7 +120,7 @@ define([
         var result = '';
         for (var i = 0; i < this._numberOfFloats; i += 4) {
             var elementCount = Math.min(this._numberOfFloats - i, 4);
-            result += variableSizeNames[elementCount] + ' ' +
+            result += 'attribute ' + variableSizeNames[elementCount] + ' ' +
                       compressedAttributeBaseName + (i / 4 | 0) + ';\n';
         }
         return result;

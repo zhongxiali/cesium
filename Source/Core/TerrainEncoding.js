@@ -166,38 +166,58 @@ define([
         this.encodedNormalGetter = undefined;
    }
 
-    function createPacker(terrainEncoding) {
-        // TODO: creating new AttributePacker for each TerrainEncoding
-        //       is super inefficient, when mostly they're all the same.
+   var cachedPackers = {};
+
+   function createPacker(terrainEncoding) {
         if (defined(terrainEncoding.packer)) {
             return;
         }
 
-        var attrType = terrainEncoding.quantization === TerrainQuantization.BITS12 ? CompressedAttributeType.TWELVE_BITS : CompressedAttributeType.FLOAT;
+        var cacheKey = JSON.stringify({
+            quantization: terrainEncoding.quantization,
+            hasVertexHeight: terrainEncoding.hasVertexHeight,
+            hasWebMercatorY: terrainEncoding.hasWebMercatorY,
+            hasVertexNormals: terrainEncoding.hasVertexNormals
+        });
 
-        var packer = terrainEncoding.packer = new AttributePacker();
-        packer.addAttribute('position', 3, attrType);
+        var cachedPacker = cachedPackers[cacheKey];
+        if (!defined(cachedPacker)) {
+            var attrType = terrainEncoding.quantization === TerrainQuantization.BITS12 ? CompressedAttributeType.TWELVE_BITS : CompressedAttributeType.FLOAT;
 
-        if (terrainEncoding.hasVertexHeight) {
-            packer.addAttribute('height', 1, attrType);
-        }
+            var packer = new AttributePacker();
+            packer.addAttribute('position', 3, attrType);
 
-        if (terrainEncoding.hasWebMercatorY) {
-            packer.addAttribute('webMercatorY', 1, attrType);
-        }
+            if (terrainEncoding.hasVertexHeight) {
+                packer.addAttribute('height', 1, attrType);
+            }
 
-        packer.addAttribute('textureCoordinates', 2, attrType);
+            if (terrainEncoding.hasWebMercatorY) {
+                packer.addAttribute('webMercatorY', 1, attrType);
+            }
 
-        if (terrainEncoding.hasVertexNormals) {
-            packer.addAttribute('encodedNormal', 1, CompressedAttributeType.FLOAT);
+            packer.addAttribute('textureCoordinates', 2, attrType);
+
+            if (terrainEncoding.hasVertexNormals) {
+                packer.addAttribute('encodedNormal', 1, CompressedAttributeType.FLOAT);
+            }
+
+            cachedPacker = cachedPackers[cacheKey] = {
+                packer: packer,
+                positionGetter: packer.createSingleAttributeGetFunction('position'),
+                heightGetter: packer.createSingleAttributeGetFunction('height'),
+                webMercatorYGetter: packer.createSingleAttributeGetFunction('webMercatorY'),
+                textureCoordinatesGetter: packer.createSingleAttributeGetFunction('textureCoordinates'),
+                encodedNormalGetter: packer.createSingleAttributeGetFunction('encodedNormal')
+            };
         }
 
         // Create the functions to get individual vertex attributes from the buffer.
-        terrainEncoding.positionGetter = packer.createSingleAttributeGetFunction('position');
-        terrainEncoding.heightGetter = packer.createSingleAttributeGetFunction('height');
-        terrainEncoding.webMercatorYGetter = packer.createSingleAttributeGetFunction('webMercatorY');
-        terrainEncoding.textureCoordinatesGetter = packer.createSingleAttributeGetFunction('textureCoordinates');
-        terrainEncoding.encodedNormalGetter = packer.createSingleAttributeGetFunction('encodedNormal');
+        terrainEncoding.packer = cachedPacker.packer;
+        terrainEncoding.positionGetter = cachedPacker.positionGetter;
+        terrainEncoding.heightGetter = cachedPacker.heightGetter;
+        terrainEncoding.webMercatorYGetter = cachedPacker.webMercatorYGetter;
+        terrainEncoding.textureCoordinatesGetter = cachedPacker.textureCoordinatesGetter;
+        terrainEncoding.encodedNormalGetter = cachedPacker.encodedNormalGetter;
     }
 
     var vertexScratch = {

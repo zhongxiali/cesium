@@ -296,6 +296,14 @@ define([
             }
 
             put += 'cartesian2Scratch.x = vertex.' + vertexMember + ';\n';
+
+            //>>includeStart('debug', pragmas.debug);
+            put += 'if (cartesian2Scratch.x < 0.0 || cartesian2Scratch.x > 1.0) { throw "TWELVE_BIT vertex attribute ' + twelveBits[i].name + ' is outside the range 0.0 - 1.0."; }\n';
+            if (second < twelveBits.length) {
+                put += 'if (cartesian2Scratch.y < 0.0 || cartesian2Scratch.y > 1.0) { throw "TWELVE_BIT vertex attribute ' + twelveBits[second].name + ' is outside the range 0.0 - 1.0."; }\n';
+            }
+            //>>includeEnd('debug');
+
             put += 'buffer[index + ' + offset + '] = AttributeCompression.compressTextureCoordinates(cartesian2Scratch);\n';
 
             ++offset;

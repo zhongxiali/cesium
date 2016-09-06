@@ -285,7 +285,7 @@ define([
 
             var webMercatorY;
             if (includeWebMercatorY) {
-                webMercatorY = (WebMercatorProjection.geodeticLatitudeToMercatorAngle(latitude) - southMercatorY) * oneOverMercatorHeight;
+                webMercatorY = CesiumMath.clamp((WebMercatorProjection.geodeticLatitudeToMercatorAngle(latitude) - southMercatorY) * oneOverMercatorHeight, 0.0, 1.0);
             }
 
             for (var colIndex = startCol; colIndex < endCol; ++colIndex) {

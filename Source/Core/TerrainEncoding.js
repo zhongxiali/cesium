@@ -204,7 +204,7 @@ define([
             cachedPacker = cachedPackers[cacheKey] = {
                 packer: packer,
                 positionGetter: packer.createSingleAttributeGetFunction('position'),
-                heightGetter: packer.createSingleAttributeGetFunction('height'),
+                heightGetter: packer.createSingleAttributeGetFunction('height', 0.0),
                 webMercatorYGetter: packer.createSingleAttributeGetFunction('webMercatorY'),
                 textureCoordinatesGetter: packer.createSingleAttributeGetFunction('textureCoordinates'),
                 encodedNormalGetter: packer.createSingleAttributeGetFunction('encodedNormal')
@@ -291,7 +291,7 @@ define([
 
         var height = this.heightGetter(buffer, vertexIndex);
 
-        if (this.quantization === TerrainQuantization.BITS12) {
+        if (this.hasVertexHeight && this.quantization === TerrainQuantization.BITS12) {
             height = height * (this.maximumHeight - this.minimumHeight) + this.minimumHeight;
         }
 

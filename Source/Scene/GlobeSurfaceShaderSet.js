@@ -87,7 +87,9 @@ define([
                     (hasVertexNormals << 11) |
                     (useWebMercatorProjection << 12) |
                     (enableFog << 13) |
-                    (quantization << 14);
+                    (quantization << 14) |
+                    (terrainEncoding.hasWebMercatorY << 15) |
+                    (terrainEncoding.hasHeight << 16);
 
         var surfaceShader = surfaceTile.surfaceShader;
         if (defined(surfaceShader) &&
@@ -153,6 +155,14 @@ define([
                 fs.defines.push('FOG');
             }
 
+            if (terrainEncoding.hasHeight) {
+                vs.defines.push('HAS_HEIGHT');
+            }
+
+            if (terrainEncoding.hasWebMercatorY) {
+                vs.defines.push('HAS_WEB_MERCATOR_Y');
+            }
+
             var computeDayColor = '\
     vec4 computeDayColor(vec4 initialColor, vec3 textureCoordinates)\n\
     {\n\
@@ -201,6 +211,7 @@ define([
     };
 
     GlobeSurfaceShaderSet.prototype.getPickShaderProgram = function(frameState, surfaceTile, useWebMercatorProjection) {
+        // TODO: unpack vertex attributes
         var quantization = 0;
         var quantizationDefine = '';
 

@@ -93,7 +93,7 @@ uniform mat4 u_scaleAndBias;
 // Vertex attributes, after unpacking
 void unpackVertexAttributes();
 vec3 position;
-float height;
+float height = 0.0;
 vec2 textureCoordinates;
 float webMercatorY;
 float encodedNormal;
@@ -103,8 +103,16 @@ void main()
     unpackVertexAttributes();
 
 #ifdef QUANTIZATION_BITS12
+
+#ifdef HAS_HEIGHT
     height = height * (u_minMaxHeight.y - u_minMaxHeight.x) + u_minMaxHeight.x;
+#endif // HAS_HEIGHT
     position = (u_scaleAndBias * vec4(position, 1.0)).xyz;
+
+#endif // QUANTIZATION_BITS12
+
+#ifndef HAS_WEB_MERCATOR_Y
+    webMercatorY = textureCoordinates.y;
 #endif
 
     vec3 position3DWC = position + u_center3D;

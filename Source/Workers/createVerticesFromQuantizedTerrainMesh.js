@@ -176,14 +176,14 @@ define([
         indexBuffer.set(parameters.indices, 0);
 
         // Add skirts.
-        var vertexBufferIndex = quantizedVertexCount * vertexStride;
+        var vertexBufferIndex = quantizedVertexCount;
         var indexBufferIndex = parameters.indices.length;
         indexBufferIndex = addSkirt(vertexBuffer, vertexBufferIndex, indexBuffer, indexBufferIndex, parameters.westIndices, encoding, heights, uvs, octEncodedNormals, ellipsoid, rectangle, parameters.westSkirtHeight, true, exaggeration);
-        vertexBufferIndex += parameters.westIndices.length * vertexStride;
+        vertexBufferIndex += parameters.westIndices.length;
         indexBufferIndex = addSkirt(vertexBuffer, vertexBufferIndex, indexBuffer, indexBufferIndex, parameters.southIndices, encoding, heights, uvs, octEncodedNormals, ellipsoid, rectangle, parameters.southSkirtHeight, false, exaggeration);
-        vertexBufferIndex += parameters.southIndices.length * vertexStride;
+        vertexBufferIndex += parameters.southIndices.length;
         indexBufferIndex = addSkirt(vertexBuffer, vertexBufferIndex, indexBuffer, indexBufferIndex, parameters.eastIndices, encoding, heights, uvs, octEncodedNormals, ellipsoid, rectangle, parameters.eastSkirtHeight, false, exaggeration);
-        vertexBufferIndex += parameters.eastIndices.length * vertexStride;
+        vertexBufferIndex += parameters.eastIndices.length;
         addSkirt(vertexBuffer, vertexBufferIndex, indexBuffer, indexBufferIndex, parameters.northIndices, encoding, heights, uvs, octEncodedNormals, ellipsoid, rectangle, parameters.northSkirtHeight, true, exaggeration);
 
         transferableObjects.push(vertexBuffer.buffer, indexBuffer.buffer);
@@ -235,7 +235,7 @@ define([
         return hMin;
     }
 
-    function addSkirt(vertexBuffer, vertexBufferIndex, indexBuffer, indexBufferIndex, edgeVertices, encoding, heights, uvs, octEncodedNormals, ellipsoid, rectangle, skirtLength, isWestOrNorthEdge, exaggeration) {
+    function addSkirt(vertexBuffer, vertexIndex, indexBuffer, indexBufferIndex, edgeVertices, encoding, heights, uvs, octEncodedNormals, ellipsoid, rectangle, skirtLength, isWestOrNorthEdge, exaggeration) {
         var start, end, increment;
         if (isWestOrNorthEdge) {
             start = edgeVertices.length - 1;
@@ -251,7 +251,6 @@ define([
 
         var hasVertexNormals = defined(octEncodedNormals);
         var vertexStride = encoding.getStride();
-        var vertexIndex = vertexBufferIndex / vertexStride;
 
         var north = rectangle.north;
         var south = rectangle.south;
@@ -294,7 +293,7 @@ define([
                 }
             }
 
-            vertexBufferIndex = encoding.encode(vertexBuffer, vertexBufferIndex, position, uv, cartographicScratch.height, toPack);
+            encoding.encode(vertexBuffer, vertexIndex, position, uv, cartographicScratch.height, toPack);
 
             if (previousIndex !== -1) {
                 indexBuffer[indexBufferIndex++] = previousIndex;

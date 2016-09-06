@@ -406,7 +406,7 @@ define([
             vertexCountWithoutSkirts : this._vertexCountWithoutSkirts,
             indices : mesh.indices,
             skirtIndex : this._skirtIndex,
-            encoding : mesh.encoding,
+            encoding : TerrainEncoding.clone(mesh.encoding),
             minimumHeight : this._minimumHeight,
             maximumHeight : this._maximumHeight,
             isEastChild : isEastChild,

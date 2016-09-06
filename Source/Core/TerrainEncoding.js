@@ -167,6 +167,8 @@ define([
    }
 
     function createPacker(terrainEncoding) {
+        // TODO: creating new AttributePacker for each TerrainEncoding
+        //       is super inefficient, when mostly they're all the same.
         if (defined(terrainEncoding.packer)) {
             return;
         }
@@ -256,6 +258,12 @@ define([
         }
 
         return this.textureCoordinatesGetter(buffer, vertexIndex, result);
+    };
+
+    TerrainEncoding.prototype.decodeWebMercatorY = function(buffer, vertexIndex) {
+        createPacker(this);
+
+        return this.webMercatorYGetter(buffer, vertexIndex);
     };
 
     TerrainEncoding.prototype.decodeHeight = function(buffer, vertexIndex) {

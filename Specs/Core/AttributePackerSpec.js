@@ -290,41 +290,41 @@ defineSuite([
         it('works with a 12 bit Cartesian2', function() {
             packer.addAttribute('foo', 2, CompressedAttributeType.TWELVE_BITS);
             packer.putVertex(fakeBuffer, 0, {
-                foo: new Cartesian2(1.23, 4.56)
+                foo: new Cartesian2(0.123, 0.456)
             });
-            expect(fakeBuffer[0]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(1.23, 4.56)));
+            expect(fakeBuffer[0]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(0.123, 0.456)));
         });
 
         it('works with a 12 bit Cartesian3', function() {
             packer.addAttribute('foo', 3, CompressedAttributeType.TWELVE_BITS);
             packer.putVertex(fakeBuffer, 0, {
-                foo: new Cartesian3(1.23, 4.56, 7.89)
+                foo: new Cartesian3(0.123, .456, .789)
             });
-            expect(fakeBuffer[0]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(1.23, 4.56)));
-            expect(fakeBuffer[1]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(7.89, 0.0)));
+            expect(fakeBuffer[0]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(0.123, 0.456)));
+            expect(fakeBuffer[1]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(0.789, 0.0)));
         });
 
         it('works with two 12 bit Cartesian2s', function() {
             packer.addAttribute('foo', 2, CompressedAttributeType.TWELVE_BITS);
             packer.addAttribute('bar', 2, CompressedAttributeType.TWELVE_BITS);
             packer.putVertex(fakeBuffer, 0, {
-                foo: new Cartesian2(1.23, 4.56),
-                bar: new Cartesian2(7.89, 10.11)
+                foo: new Cartesian2(0.123, 0.456),
+                bar: new Cartesian2(0.789, 0.1011)
             });
-            expect(fakeBuffer[0]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(1.23, 4.56)));
-            expect(fakeBuffer[1]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(7.89, 10.11)));
+            expect(fakeBuffer[0]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(0.123, 0.456)));
+            expect(fakeBuffer[1]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(0.789, 0.1011)));
         });
 
         it('works with two 12 bit Cartesian3s', function() {
             packer.addAttribute('foo', 3, CompressedAttributeType.TWELVE_BITS);
             packer.addAttribute('bar', 3, CompressedAttributeType.TWELVE_BITS);
             packer.putVertex(fakeBuffer, 0, {
-                foo: new Cartesian3(1.23, 4.56, 7.89),
-                bar: new Cartesian3(10.11, 12.13, 14.15)
+                foo: new Cartesian3(0.123, 0.456, 0.789),
+                bar: new Cartesian3(0.1011, 0.1213, 0.1415)
             });
-            expect(fakeBuffer[0]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(1.23, 4.56)));
-            expect(fakeBuffer[1]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(7.89, 10.11)));
-            expect(fakeBuffer[2]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(12.13, 14.15)));
+            expect(fakeBuffer[0]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(0.123, 0.456)));
+            expect(fakeBuffer[1]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(0.789, 0.1011)));
+            expect(fakeBuffer[2]).toBe(AttributeCompression.compressTextureCoordinates(new Cartesian2(0.1213, 0.1415)));
         });
     });
 

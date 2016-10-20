@@ -225,8 +225,8 @@ Change Log
 * `Camera.flyTo` now honors max and min zoom settings in `ScreenSpaceCameraController`.
 * Added `show` property to `CzmlDataSource`, `GeoJsonDataSource`, `KmlDataSource`, `CustomDataSource`, and `EntityCollection` for easily toggling display of entire data sources.
 * Added `owner` property to `CompositeEntityCollection`.
-* Fix an issue when changing a billboard's position property multiple times per frame. [#3511](https://github.com/AnalyticalGraphicsInc/cesium/pull/3511)
 * Added `DataSouceDisplay.ready` for determining whether or not static data associated with the Entity API has been rendered.
+* Fix an issue when changing a billboard's position property multiple times per frame. [#3511](https://github.com/AnalyticalGraphicsInc/cesium/pull/3511)
 * Fixed texture coordinates for polygon with position heights.
 * Fixed issue that kept `GroundPrimitive` with an `EllipseGeometry` from having a `rotation`.
 * Fixed crash caused when drawing `CorridorGeometry` and `CorridorOutlineGeometry` synchronously.

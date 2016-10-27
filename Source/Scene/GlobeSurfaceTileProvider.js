@@ -1004,7 +1004,7 @@ define([
 
         var firstPassRenderState = tileProvider._renderState;
         var otherPassesRenderState = tileProvider._blendRenderState;
-        var renderState = firstPassRenderState;
+        var renderState = otherPassesRenderState;
 
         var initialColor = tileProvider._firstPassInitialColor;
 

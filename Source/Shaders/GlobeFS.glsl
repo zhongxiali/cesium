@@ -1,5 +1,4 @@
 //#define SHOW_TILE_BOUNDARIES
-
 uniform vec4 u_initialColor;
 
 #if TEXTURE_UNITS > 0
@@ -178,6 +177,7 @@ void main()
     vec4 finalColor = color;
 #endif
 
+    finalColor.a = 0.6;
 
 #ifdef FOG
     const float fExposure = 2.0;

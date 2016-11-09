@@ -1,6 +1,7 @@
 /*global define*/
 define([
         '../ThirdParty/when',
+        './TrustedServers',
         './defaultValue',
         './defined',
         './DeveloperError',
@@ -8,6 +9,7 @@ define([
         './RuntimeError'
     ], function(
         when,
+        TrustedServers,
         defaultValue,
         defined,
         DeveloperError,
@@ -124,7 +126,9 @@ define([
             case 'json':
                 return JSON.parse(decodeDataUriText(isBase64, data));
             default:
+                //>>includeStart('debug', pragmas.debug);
                 throw new DeveloperError('Unhandled responseType: ' + responseType);
+                //>>includeEnd('debug');
         }
     }
 
@@ -137,6 +141,10 @@ define([
         }
 
         var xhr = new XMLHttpRequest();
+
+        if (TrustedServers.contains(url)) {
+            xhr.withCredentials = true;
+        }
 
         var weWantXml = false;
 

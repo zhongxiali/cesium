@@ -7,7 +7,6 @@ define([
         '../Core/defaultValue',
         '../Core/defined',
         '../Core/defineProperties',
-        '../Core/deprecationWarning',
         '../Core/destroyObject',
         '../Core/DeveloperError',
         '../Core/Ellipsoid',
@@ -38,7 +37,6 @@ define([
         defaultValue,
         defined,
         defineProperties,
-        deprecationWarning,
         destroyObject,
         DeveloperError,
         Ellipsoid,
@@ -281,46 +279,6 @@ define([
             get: function() {
                 return this._surface.tileLoadProgressEvent;
             }
-        },
-
-        /**
-         * Determines whether the globe casts shadows from each light source.
-         *
-         * @memberof Globe.prototype
-         * @type {Boolean}
-         * @deprecated
-         */
-        castShadows : {
-            get : function() {
-                deprecationWarning('Globe.castShadows', 'Globe.castShadows was deprecated in Cesium 1.25. It will be removed in 1.26. Use Globe.shadows instead.');
-                return ShadowMode.castShadows(this.shadows);
-            },
-            set : function(value) {
-                deprecationWarning('Globe.castShadows', 'Globe.castShadows was deprecated in Cesium 1.25. It will be removed in 1.26. Use Globe.shadows instead.');
-                var castShadows = value;
-                var receiveShadows = ShadowMode.receiveShadows(this.shadows);
-                this.shadows = ShadowMode.fromCastReceive(castShadows, receiveShadows);
-            }
-        },
-
-        /**
-         * Determines whether the globe receives shadows from shadow casters in the scene.
-         *
-         * @memberof Globe.prototype
-         * @type {Boolean}
-         * @deprecated
-         */
-        receiveShadows : {
-            get : function() {
-                deprecationWarning('Globe.receiveShadows', 'Globe.receiveShadows was deprecated in Cesium 1.25. It will be removed in 1.26. Use Globe.shadows instead.');
-                return ShadowMode.receiveShadows(this.shadows);
-            },
-            set : function(value) {
-                deprecationWarning('Globe.receiveShadows', 'Globe.receiveShadows was deprecated in Cesium 1.25. It will be removed in 1.26. Use Globe.shadows instead.');
-                var castShadows = ShadowMode.castShadows(this.shadows);
-                var receiveShadows = value;
-                this.shadows = ShadowMode.fromCastReceive(castShadows, receiveShadows);
-            }
         }
     });
 
@@ -487,6 +445,10 @@ define([
     var scratchGetHeightCartographic = new Cartographic();
     var scratchGetHeightRay = new Ray();
 
+    function tileIfContainsCartographic(tile, cartographic) {
+        return Rectangle.contains(tile.rectangle, cartographic) ? tile : undefined;
+    }
+
     /**
      * Get the height of the surface at a given cartographic.
      *
@@ -521,15 +483,10 @@ define([
         }
 
         while (tile.renderable) {
-            var children = tile.children;
-            length = children.length;
-
-            for (i = 0; i < length; ++i) {
-                tile = children[i];
-                if (Rectangle.contains(tile.rectangle, cartographic)) {
-                    break;
-                }
-            }
+            tile = tileIfContainsCartographic(tile.southwestChild, cartographic) ||
+                   tileIfContainsCartographic(tile.southeastChild, cartographic) ||
+                   tileIfContainsCartographic(tile.northwestChild, cartographic) ||
+                   tile.northeastChild;
         }
 
         while (defined(tile) && (!defined(tile.data) || !defined(tile.data.pickTerrain))) {

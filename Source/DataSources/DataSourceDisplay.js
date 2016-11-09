@@ -370,7 +370,7 @@ define([
 
         scene.primitives.add(entityCluster);
 
-        var visualizers = this._visualizersCallback(this._scene, dataSource);
+        var visualizers = this._visualizersCallback(scene, entityCluster, dataSource);
 
         dataSource._visualizersByDisplayID = dataSource._visualizersByDisplayID || {};
         dataSource._visualizersByDisplayID[this._displayID] = visualizers;

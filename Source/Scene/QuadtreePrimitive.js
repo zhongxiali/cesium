@@ -389,6 +389,20 @@ define([
         this._tileProvider = this._tileProvider && this._tileProvider.destroy();
     };
 
+    var comparisonPoint;
+    var centerScratch = new Cartographic();
+    function compareDistanceToPoint(a, b) {
+        var center = Rectangle.center(a.rectangle, centerScratch);
+        var alon = center.longitude - comparisonPoint.longitude;
+        var alat = center.latitude - comparisonPoint.latitude;
+
+        center = Rectangle.center(b.rectangle, centerScratch);
+        var blon = center.longitude - comparisonPoint.longitude;
+        var blat = center.latitude - comparisonPoint.latitude;
+
+        return (alon * alon + alat * alat) - (blon * blon + blat * blat);
+    }
+
     function selectTilesForRendering(primitive, frameState) {
         var debug = primitive._debug;
         if (debug.suspendLodUpdate) {
@@ -420,6 +434,12 @@ define([
 
         var tile;
         var levelZeroTiles = primitive._levelZeroTiles;
+
+        // Sort the level zero tiles by the distance from the center to the camera.
+        // The level zero tiles aren't necessarily a nice neat quad, so we can use the
+        // quadtree ordering we use elsewhere in the tree
+        comparisonPoint = frameState.camera.positionCartographic;
+        levelZeroTiles.sort(compareDistanceToPoint);
 
         var customDataAdded = primitive._addHeightCallbacks;
         var customDataRemoved = primitive._removeHeightCallbacks;
@@ -514,6 +534,11 @@ define([
             if (allAreUpsampled) {
                 // No point in rendering the children because they're all upsampled.  Render this tile instead.
                 addTileToRenderList(primitive, tile);
+
+                // Load the children even though we're (currently) not going to render them.
+                // A tile that is "upsampled only" right now might change its tune once it does more loading.
+                // A tile that is upsampled now and forever should also be done loading, so no harm done.
+                queueChildLoadNearToFar(primitive, frameState.camera.positionCartographic, southwestChild, southeastChild, northwestChild, northeastChild);
 
                 if (tile.needsLoading) {
                     // Rendered tile that's not waiting on children loads with medium priority.
@@ -797,16 +822,10 @@ define([
         }
     }
 
-    function tileDistanceSortFunction(a, b) {
-        return a._distance - b._distance;
-    }
-
     function createRenderCommandsForSelectedTiles(primitive, frameState) {
         var tileProvider = primitive._tileProvider;
         var tilesToRender = primitive._tilesToRender;
         var tilesToUpdateHeights = primitive._tileToUpdateHeights;
-
-        tilesToRender.sort(tileDistanceSortFunction);
 
         for (var i = 0, len = tilesToRender.length; i < len; ++i) {
             var tile = tilesToRender[i];

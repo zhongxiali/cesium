@@ -365,10 +365,12 @@ define([
     DataSourceDisplay.prototype._onDataSourceAdded = function(dataSourceCollection, dataSource) {
         var scene = this._scene;
 
-        var entityCluster = dataSource.clustering;
-        entityCluster._initialize(scene);
-
-        scene.primitives.add(entityCluster);
+        var entityCluster;
+        if (defined(scene) && defined(scene.camera)) {
+            entityCluster = dataSource.clustering;
+            entityCluster._initialize(scene);
+            scene.primitives.add(entityCluster);
+        }
 
         var visualizers = this._visualizersCallback(scene, entityCluster, dataSource);
 
@@ -381,8 +383,11 @@ define([
 
     DataSourceDisplay.prototype._onDataSourceRemoved = function(dataSourceCollection, dataSource) {
         var scene = this._scene;
-        var entityCluster = dataSource.clustering;
-        scene.primitives.remove(entityCluster);
+
+        if (defined(scene) && defined(scene.primitives)) {
+            var entityCluster = dataSource.clustering;
+            scene.primitives.remove(entityCluster);
+        }
 
         var visualizers = dataSource._visualizersByDisplayID[this._displayID];
         if (!defined(visualizers)) {

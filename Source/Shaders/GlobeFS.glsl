@@ -195,6 +195,7 @@ void main()
     vec4 finalColor = color;
 #endif
 
+    finalColor.a = 0.6;
 
 #ifdef FOG
     const float fExposure = 2.0;

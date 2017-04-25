@@ -4,15 +4,8 @@
 /.idea
 /.metadata
 /Apps
-/Build
 /Documentation
 /Instrumented
-/launches
-/server.js
-/Source/copyrightHeader.js
-/Source/main.js
-/Specs
-/Tools
 /launches
 /Cesium-*.zip
 .DS_Store
@@ -22,7 +15,5 @@ Thumbs.db
 
 /Apps/Sandcastle/jsHintOptions.js
 /Apps/Sandcastle/gallery/gallery-index.js
-
-/Specs/SpecList.js
 
 /node_modules

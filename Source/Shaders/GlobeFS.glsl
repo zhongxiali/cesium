@@ -52,6 +52,10 @@ uniform sampler2D u_oceanNormalMap;
 uniform vec2 u_lightingFadeDistance;
 #endif
 
+//#ifdef TRANSLUCENT_TERRAIN
+uniform float u_opacity;
+//#endif
+
 varying vec3 v_positionMC;
 varying vec3 v_positionEC;
 varying vec3 v_textureCoordinates;
@@ -195,7 +199,7 @@ void main()
     vec4 finalColor = color;
 #endif
 
-    finalColor.a = 0.6;
+    finalColor.a *= u_opacity;
 
 #ifdef FOG
     const float fExposure = 2.0;

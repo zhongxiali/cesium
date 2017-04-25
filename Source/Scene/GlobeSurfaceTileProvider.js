@@ -123,6 +123,7 @@ define([
         this.zoomedOutOceanSpecularIntensity = 0.5;
         this.enableLighting = false;
         this.shadows = ShadowMode.RECEIVE_ONLY;
+        this.opacity = 1.0;
 
         this._quadtree = undefined;
         this._terrainProvider = options.terrainProvider;
@@ -758,6 +759,9 @@ define([
             u_dayTextureSplit : function() {
                 return this.properties.dayTextureSplit;
             },
+            u_opacity : function() {
+                return this.properties.opacity;
+            },
 
             // make a separate object so that changes to the properties are seen on
             // derived commands that combine another uniform map with this one.
@@ -792,7 +796,9 @@ define([
                 waterMaskTranslationAndScale : new Cartesian4(),
 
                 minMaxHeight : new Cartesian2(),
-                scaleAndBias : new Matrix4()
+                scaleAndBias : new Matrix4(),
+
+                opacity : 1.0
             }
         };
 
@@ -1058,6 +1064,7 @@ define([
             uniformMapProperties.lightingFadeDistance.x = tileProvider.lightingFadeOutDistance;
             uniformMapProperties.lightingFadeDistance.y = tileProvider.lightingFadeInDistance;
             uniformMapProperties.zoomedOutOceanSpecularIntensity = tileProvider.zoomedOutOceanSpecularIntensity;
+            uniformMapProperties.opacity = tileProvider.opacity;
 
             uniformMapProperties.center3D = surfaceTile.center;
             Cartesian3.clone(rtc, uniformMapProperties.rtc);

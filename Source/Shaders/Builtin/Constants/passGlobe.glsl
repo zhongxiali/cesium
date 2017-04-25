@@ -6,4 +6,4 @@
  *
  * @see czm_pass
  */
-const float czm_passGlobe = 2.0;
+const float czm_passGlobe = 3.0;

@@ -3225,7 +3225,7 @@ define([
                     uniformMap : uniformMap,
                     renderState : rs,
                     owner : owner,
-                    pass : isTranslucent ? Pass.TRANSLUCENT : Pass.OPAQUE
+                    pass : isTranslucent ? Pass.TRANSLUCENT : Pass.UNDERGROUND
                 });
 
                 var pickCommand;

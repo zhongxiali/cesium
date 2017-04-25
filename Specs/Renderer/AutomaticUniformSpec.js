@@ -1067,6 +1067,20 @@ defineSuite([
         }).contextToRender();
     });
 
+    it('has czm_pass and czm_passUndeground', function() {
+        var us = context.uniformState;
+        us.updatePass(Pass.UNDERGROUND);
+
+        var fs =
+            'void main() { ' +
+            '  gl_FragColor = vec4(czm_pass == czm_passUnderground);' +
+            '}';
+        expect({
+            context : context,
+            fragmentShader : fs
+        }).contextToRender();
+    });
+
     it('has czm_pass and czm_passGlobe', function() {
         var us = context.uniformState;
         us.updatePass(Pass.GLOBE);

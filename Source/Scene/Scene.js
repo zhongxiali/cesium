@@ -1863,9 +1863,16 @@ define([
 
             clearDepth.execute(context, passState);
 
+            us.updatePass(Pass.UNDERGROUND);
+            var commands = frustumCommands.commands[Pass.UNDERGROUND];
+            var length = frustumCommands.indices[Pass.UNDERGROUND];
+            for (j = 0; j < length; ++j) {
+                executeCommand(commands[j], scene, context, passState);
+            }
+
             us.updatePass(Pass.GLOBE);
-            var commands = frustumCommands.commands[Pass.GLOBE];
-            var length = frustumCommands.indices[Pass.GLOBE];
+            commands = frustumCommands.commands[Pass.GLOBE];
+            length = frustumCommands.indices[Pass.GLOBE];
             for (j = 0; j < length; ++j) {
                 executeCommand(commands[j], scene, context, passState);
             }

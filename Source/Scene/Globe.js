@@ -197,6 +197,15 @@ define([
          */
         this.shadows = ShadowMode.RECEIVE_ONLY;
 
+        /**
+         * The opacity of the globe surface.  1.0 is fully opaque and 0.0 is fully transparent.
+         * Values in between are partially translucent.
+         *
+         * @type {Number}
+         * @default 1.0
+         */
+        this.opacity = 0.4;
+
         this._oceanNormalMap = undefined;
         this._zoomedOutOceanSpecularIntensity = 0.5;
     }
@@ -585,6 +594,7 @@ define([
             tileProvider.oceanNormalMap = this._oceanNormalMap;
             tileProvider.enableLighting = this.enableLighting;
             tileProvider.shadows = this.shadows;
+            tileProvider.opacity = this.opacity;
 
             surface.beginFrame(frameState);
         }

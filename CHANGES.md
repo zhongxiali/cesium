@@ -4,6 +4,7 @@ Change Log
 ### TerriaJS-only
 
 * Fixed a bug that could cause tiles to be missing from the globe surface, especially when starting with the camera zoomed close to the surface.
+* Don't allow picking on the sunPostProcess framebuffer [#5496](https://github.com/AnalyticalGraphicsInc/cesium/pull/5496/commits).
 
 ### 1.33 - 2017-05-01
 

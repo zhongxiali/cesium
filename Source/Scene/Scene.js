@@ -2481,7 +2481,7 @@ define([
             scene._fxaa.clear(context, passState, clearColor);
         }
 
-        if (environmentState.isSunVisible && scene.sunBloom && !useWebVR && !picking) {
+        if (environmentState.isSunVisible && scene.sunBloom && !useWebVR) {
             passState.framebuffer = scene._sunPostProcess.update(passState);
         } else if (useGlobeDepthFramebuffer) {
             passState.framebuffer = scene._globeDepth.framebuffer;
@@ -2814,6 +2814,7 @@ define([
 
         var passState = this._pickFramebuffer.begin(scratchRectangle);
 
+        updateEnvironment(this, passState);
         updateAndExecuteCommands(this, passState, scratchColorZero);
         resolveFramebuffers(this, passState);
 
@@ -2960,6 +2961,7 @@ define([
         passState.scissorTest.rectangle.width = 1;
         passState.scissorTest.rectangle.height = 1;
 
+        updateEnvironment(scene, passState);
         updateAndExecuteCommands(scene, passState, scratchColorZero);
         resolveFramebuffers(scene, passState);
 

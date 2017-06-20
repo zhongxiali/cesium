@@ -263,7 +263,7 @@ define([
          * @type {Boolean}
          * @default true
          */
-        this.enableCollisionDetection = true;
+        this.enableCollisionDetection = false;
 
         this._scene = scene;
         this._globe = undefined;
@@ -825,7 +825,9 @@ define([
         var pickDistance = defined(depthIntersection) ? Cartesian3.distance(depthIntersection, camera.positionWC) : Number.POSITIVE_INFINITY;
         var rayDistance = defined(rayIntersection) ? Cartesian3.distance(rayIntersection, camera.positionWC) : Number.POSITIVE_INFINITY;
 
-        if (pickDistance < rayDistance) {
+        // When the globe is translucent, prefer to pick from other scene elements (e.g. underground features) instead of the
+        // globe.  Unless those features are too far away.
+        if (pickDistance < rayDistance || (globe.opacity < 1.0 && pickDistance < 1000000)) {
             return Cartesian3.clone(depthIntersection, result);
         }
 

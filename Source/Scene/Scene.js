@@ -1941,9 +1941,9 @@ define([
 
             if (clearGlobeDepth) {
                 clearDepth.execute(context, passState);
-                if (useDepthPlane) {
-                    depthPlane.execute(context, passState);
-                }
+                // if (useDepthPlane) {
+                //     depthPlane.execute(context, passState);
+                // }
             }
 
             // Execute commands in order by pass up to the translucent pass.
@@ -3081,8 +3081,12 @@ define([
                 Cartesian4.divideByScalar(packedDepth, 255.0, packedDepth);
                 var undergroundDepth = Cartesian4.dot(packedDepth, packedDepthScale);
 
-                if (undergroundDepth > 0.0 && undergroundDepth < 1.0 && undergroundDepth < depth) {
-                    depth = undergroundDepth;
+                if (undergroundDepth > 0.0 && undergroundDepth < 1.0) {
+                    if (depth > 0.0 && depth < 1.0) {
+                        depth = Math.min(depth, undergroundDepth);
+                    } else {
+                        depth = undergroundDepth;
+                    }
                 }
             }
 

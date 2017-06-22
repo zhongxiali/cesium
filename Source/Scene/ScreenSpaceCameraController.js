@@ -1593,7 +1593,7 @@ define([
         var ellipsoid = controller._ellipsoid;
         var cartographic = ellipsoid.cartesianToCartographic(camera.position, tilt3DCart);
 
-        if (controller._tiltOnEllipsoid || cartographic.height > controller._minimumCollisionTerrainHeight) {
+        if (controller._tiltOnEllipsoid || cartographic.height > controller._minimumPickingTerrainHeight) {
             controller._tiltOnEllipsoid = true;
             tilt3DOnEllipsoid(controller, startPosition, movement);
         } else {

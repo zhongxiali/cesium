@@ -304,6 +304,7 @@ define([
         });
 
         this._pickDepths = [];
+        this._undergroundPickDepths = [];
         this._debugGlobeDepths = [];
 
         this._pickDepthPassState = undefined;
@@ -1761,6 +1762,15 @@ define([
         return pickDepth;
     }
 
+    function getUndergroundPickDepth(scene, index) {
+        var pickDepth = scene._undergroundPickDepths[index];
+        if (!defined(pickDepth)) {
+            pickDepth = new PickDepth();
+            scene._undergroundPickDepths[index] = pickDepth;
+        }
+        return pickDepth;
+    }
+
     var scratchPerspectiveFrustum = new PerspectiveFrustum();
     var scratchPerspectiveOffCenterFrustum = new PerspectiveOffCenterFrustum();
     var scratchOrthographicFrustum = new OrthographicFrustum();
@@ -1890,6 +1900,15 @@ define([
             var length = frustumCommands.indices[Pass.UNDERGROUND];
             for (j = 0; j < length; ++j) {
                 executeCommand(commands[j], scene, context, passState);
+            }
+
+            // If there are underground commands, squirrel away the underground depth
+            // separately so we can use it for position picking for underground camera control.
+            if (length > 0) {
+                var undergroundPickDepth = getUndergroundPickDepth(scene, index);
+                var depthStencilTexture = depthOnly ? passState.framebuffer.depthStencilTexture : globeDepth.framebuffer.depthStencilTexture;
+                undergroundPickDepth.update(context, depthStencilTexture);
+                undergroundPickDepth.executeCopyDepth(context, passState);
             }
 
             us.updatePass(Pass.GLOBE);
@@ -3048,6 +3067,24 @@ define([
             var packedDepth = Cartesian4.unpack(pixels, 0, scratchPackedDepth);
             Cartesian4.divideByScalar(packedDepth, 255.0, packedDepth);
             var depth = Cartesian4.dot(packedDepth, packedDepthScale);
+
+            if (defined(this._undergroundPickDepths[i])) {
+                pixels = context.readPixels({
+                    x : drawingBufferPosition.x,
+                    y : drawingBufferPosition.y,
+                    width : 1,
+                    height : 1,
+                    framebuffer : this._undergroundPickDepths[i].framebuffer
+                });
+
+                packedDepth = Cartesian4.unpack(pixels, 0, scratchPackedDepth);
+                Cartesian4.divideByScalar(packedDepth, 255.0, packedDepth);
+                var undergroundDepth = Cartesian4.dot(packedDepth, packedDepthScale);
+
+                if (undergroundDepth > 0.0 && undergroundDepth < 1.0 && undergroundDepth < depth) {
+                    depth = undergroundDepth;
+                }
+            }
 
             if (depth > 0.0 && depth < 1.0) {
                 var renderedFrustum = this._frustumCommandsList[i];

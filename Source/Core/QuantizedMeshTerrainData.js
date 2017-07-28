@@ -185,10 +185,10 @@ define([
         this._eastIndices = sortIndicesIfNecessary(options.eastIndices, sortByV, vertexCount);
         this._northIndices = sortIndicesIfNecessary(options.northIndices, sortByU, vertexCount);
 
-        this._westSkirtHeight = options.westSkirtHeight;
-        this._southSkirtHeight = options.southSkirtHeight;
-        this._eastSkirtHeight = options.eastSkirtHeight;
-        this._northSkirtHeight = options.northSkirtHeight;
+        this._westSkirtHeight = 0.0; //options.westSkirtHeight;
+        this._southSkirtHeight = 0.0; //options.southSkirtHeight;
+        this._eastSkirtHeight = 0.0; //options.eastSkirtHeight;
+        this._northSkirtHeight = 0.0; //options.northSkirtHeight;
 
         this._childTileMask = defaultValue(options.childTileMask, 15);
 

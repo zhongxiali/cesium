@@ -617,6 +617,20 @@ define([
         return ImageryProvider.loadImage(this, url);
     };
 
+    UrlTemplateImageryProvider.prototype.getPickFeaturesUrl = function(x, y, level, longitude, latitude, format) {
+        //>>includeStart('debug', pragmas.debug);
+        if (!this.ready) {
+            throw new DeveloperError('pickFeatures must not be called before the imagery provider is ready.');
+        }
+        //>>includeEnd('debug');
+
+        if (!this.enablePickFeatures || !defined(this._pickFeaturesUrl)) {
+            return undefined;
+        }
+
+        return buildPickFeaturesUrl(this, x, y, level, longitude, latitude, format);
+    };
+
     /**
      * Asynchronously determines what features, if any, are located at a given longitude and latitude within
      * a tile.  This function should not be called before {@link ImageryProvider#ready} returns true.

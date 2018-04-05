@@ -1884,9 +1884,13 @@ define([
 
         // Do not render environment primitives during a pick pass since they do not generate picking commands.
         if (!picking) {
-            var skyBoxCommand = environmentState.skyBoxCommand;
-            if (defined(skyBoxCommand)) {
-                executeCommand(skyBoxCommand, scene, context, passState);
+            var skyBoxCommands = environmentState.skyBoxCommands;
+            if (defined(skyBoxCommands)) {
+                skyBoxCommands.forEach(command => {
+                    if (command) {
+                        executeCommand(command, scene, context, passState);
+                    }
+                });
             }
 
             if (environmentState.isSkyAtmosphereVisible) {
@@ -2483,7 +2487,7 @@ define([
 
         if (!renderPass || (scene._mode !== SceneMode.SCENE2D && frameState.camera.frustum instanceof OrthographicFrustum)) {
             environmentState.skyAtmosphereCommand = undefined;
-            environmentState.skyBoxCommand = undefined;
+            environmentState.skyBoxCommands = undefined;
             environmentState.sunDrawCommand = undefined;
             environmentState.sunComputeCommand = undefined;
             environmentState.moonCommand = undefined;
@@ -2493,7 +2497,16 @@ define([
                 environmentState.isReadyForAtmosphere = environmentState.isReadyForAtmosphere || globe._surface._tilesToRender.length > 0;
             }
             environmentState.skyAtmosphereCommand = defined(skyAtmosphere) ? skyAtmosphere.update(frameState) : undefined;
-            environmentState.skyBoxCommand = defined(scene.skyBox) ? scene.skyBox.update(frameState) : undefined;
+
+            if (defined(scene.skyBox)) {
+                if (Array.isArray(scene.skyBox)) {
+                    environmentState.skyBoxCommands = scene.skyBox.map(skyBox => skyBox.update(frameState));
+                } else {
+                    environmentState.skyBoxCommands = [scene.skyBox.update(frameState)];
+                }
+            } else {
+                environmentState.skyBoxCommands = undefined;
+            }
             var sunCommands = defined(scene.sun) ? scene.sun.update(frameState, passState) : undefined;
             environmentState.sunDrawCommand = defined(sunCommands) ? sunCommands.drawCommand : undefined;
             environmentState.sunComputeCommand = defined(sunCommands) ? sunCommands.computeCommand : undefined;
@@ -3509,7 +3522,7 @@ define([
         this._primitives = this._primitives && this._primitives.destroy();
         this._groundPrimitives = this._groundPrimitives && this._groundPrimitives.destroy();
         this._globe = this._globe && this._globe.destroy();
-        this.skyBox = this.skyBox && this.skyBox.destroy();
+        //this.skyBox = this.skyBox && this.skyBox.destroy();
         this.skyAtmosphere = this.skyAtmosphere && this.skyAtmosphere.destroy();
         this._debugSphere = this._debugSphere && this._debugSphere.destroy();
         this.sun = this.sun && this.sun.destroy();

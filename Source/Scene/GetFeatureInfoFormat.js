@@ -67,6 +67,8 @@ define([
                 callback = textToFeatureInfo;
             } else if (type === 'text') {
                 callback = textToFeatureInfo;
+            } else if (type === 'reportalljson') {
+                callback = reportalljsonToFeatureInfo;
             }
             //>>includeStart('debug', pragmas.debug);
             else {
@@ -81,6 +83,32 @@ define([
     function geoJsonToFeatureInfo(json) {
         var result = [];
 
+        var features = json.features;
+        for (var i = 0; i < features.length; ++i) {
+            var feature = features[i];
+
+            var featureInfo = new ImageryLayerFeatureInfo();
+            featureInfo.data = feature;
+            featureInfo.properties = feature.properties;
+            featureInfo.configureNameFromProperties(feature.properties);
+            featureInfo.configureDescriptionFromProperties(feature.properties);
+
+            // If this is a point feature, use the coordinates of the point.
+            if (defined(feature.geometry) && feature.geometry.type === 'Point') {
+                var longitude = feature.geometry.coordinates[0];
+                var latitude = feature.geometry.coordinates[1];
+                featureInfo.position = Cartographic.fromDegrees(longitude, latitude);
+            }
+
+            result.push(featureInfo);
+        }
+
+        return result;
+    }
+
+    function reportalljsonToFeatureInfo(json) {
+        var result = [];
+        console.log(json)
         var features = json.features;
         for (var i = 0; i < features.length; ++i) {
             var feature = features[i];
